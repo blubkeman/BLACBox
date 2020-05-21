@@ -1,6 +1,6 @@
 /*
- * PS3_Nav.h - Library for PS3 Move Navigation controller for the B.L.A.C.Box system
- * Created by Brian Lubkeman, 18 April 2020
+ * Controller_PS3Nav.h - Library for PS3 Move Navigation controller for the B.L.A.C.Box system
+ * Created by Brian Lubkeman, 21 May 2020
  * Inspired by S.H.A.D.O.W. controller code written by KnightShade
  * Released into the public domain.
  */
@@ -51,16 +51,16 @@ class BLACBox_PS3Nav
     void _resetCriticalFault(PS3BT* controller, uint8_t controllerNumber);
     void _displayTimes(unsigned long, unsigned long, unsigned long);
 
-  // Stop motor functions
-    void _stopDomeMotor();
-    void _stopFootMotors();
-    void _stopAllMotors();
+//    #if defined(BLACBOX_DEBUG) || defined (BLACBOX_VERBOSE)
+    String _className;
+//    #endif
 
   public:
     // =====================
     //      Constructor
     // =====================
     BLACBox_PS3Nav(Buffer* pBuffer) : _Usb(), _Btd(&_Usb), _primary(&_Btd), _secondary(&_Btd) {
+
       // Prepare critical fault data for each controller.
       _faultData[PRIMARY].badData       = 0;
       _faultData[PRIMARY].lastMsgTime   = -1;
@@ -68,8 +68,14 @@ class BLACBox_PS3Nav
       _faultData[SECONDARY].badData     = 0;
       _faultData[SECONDARY].lastMsgTime = -1;
       _faultData[SECONDARY].priority    = "secondary";
+
       // Define a buffer to store the controller input.
-      _buffer = pBuffer;    
+      _buffer = pBuffer;
+
+      #if defined(BLACBOX_DEBUG) || defined (BLACBOX_VERBOSE)
+      _className = F("BLACBox_PS3Nav::");
+      #endif
+
     };
 
     // For attachOnInit
@@ -79,12 +85,18 @@ class BLACBox_PS3Nav
     //      begin()
     // =================
     void begin() {
+
+      #if defined(BLACBOX_DEBUG) || defined (BLACBOX_VERBOSE)
+      String functionName = _className+F("begin()");
+      #endif
+
       // Start the USB host.
       if (_Usb.Init() == -1) {
         Serial.println(F("OSC did not start"));
         while (1); //halt
       }
       Serial.println(F("Bluetooth Library Started"));
+
       // Prepare for starting the controller(s).
       thisController = this;
       _primary.attachOnInit(_onInitPrimary);
@@ -96,8 +108,8 @@ class BLACBox_PS3Nav
     // ================
     bool read() {
 
-      #ifdef TEST_CONTROLLER
-      _buffer->inputRecvd = false;
+      #if defined(BLACBOX_DEBUG) || defined (BLACBOX_VERBOSE)
+      String functionName = _className+F("read()");
       #endif
 
       // Finish cycling the status after disconnecting the primary controller.
@@ -111,7 +123,7 @@ class BLACBox_PS3Nav
 
       // Make sure the motors are not running when we have no controllers.
       if (!primaryIsConnected() && !secondaryIsConnected()) {
-        _stopAllMotors();
+        stopAllMotors();
         return false;
       }
 
@@ -138,12 +150,71 @@ class BLACBox_PS3Nav
     bool primaryIsConnected()   { return _primary.PS3NavigationConnected; };
     bool secondaryIsConnected() { return _secondary.PS3NavigationConnected; };
 
+  /* =======================================
+   *          Stop motor functions
+   * ======================================= */
+  
+    // ==========================
+    //      _stopDomeMotor()
+    // ==========================
+    void BLACBox_PS3Nav::stopDomeMotor() {
+    /*
+     * TODO: Work out isFootMotorStopped, stopFeet()
+     * 
+      stopFeet();
+     */
+    
+      #if defined(BLACBOX_DEBUG) || defined (BLACBOX_VERBOSE)
+      String functionName = _className+F("_stopDomeMotor()");
+      #endif
+    
+      _buffer->setStatus(DomeMotorStopped, true);
+    };
+    
+    // ===========================
+    //      _stopFootMotors()
+    // ===========================
+    void BLACBox_PS3Nav::stopFootMotors() {
+    /*
+     * TODO: Work out SyR.stop();
+     * 
+      SyR.stop();
+      _buffer->setStatus(DomeMotorStopped, true);
+     */
+    
+      #if defined(BLACBOX_DEBUG) || defined (BLACBOX_VERBOSE)
+      String functionName = _className+F("_stopFootMotors()");
+      #endif
+    
+    };
+    
+    // ==========================
+    //      _stopAllMotors()
+    // ==========================
+    void BLACBox_PS3Nav::stopAllMotors() {
+    
+      #if defined(BLACBOX_DEBUG) || defined (BLACBOX_VERBOSE)
+      String functionName = _className+F("_stopAllMotors()");
+      #endif
+    
+      #ifdef DRIVE
+      stopFootMotors();
+      #endif
+      #ifdef DOME
+      stopDomeMotor();
+      #endif
+    };
 };
 
 // ======================
 //      _setBuffer()
 // ======================
 void BLACBox_PS3Nav::_setBuffer() {
+
+  #if defined(BLACBOX_DEBUG) || defined (BLACBOX_VERBOSE)
+  String functionName = _className+F("_setBuffer()");
+  #endif
+
   // Set controller connection states.
 
   if (primaryIsConnected()) {
@@ -198,7 +269,7 @@ void BLACBox_PS3Nav::_setBuffer() {
   #ifdef TEST_CONTROLLER
   // Using only one of these at a time is recommended.
   _buffer->testInput();
-  //_buffer.scrollInput();
+  //_buffer->scrollInput();
   #endif
 };
 
@@ -206,11 +277,15 @@ void BLACBox_PS3Nav::_setBuffer() {
 //      _manageDisconnect()
 // =============================
 void BLACBox_PS3Nav::_manageDisconnect() {
+
+  #if defined(BLACBOX_DEBUG) || defined (BLACBOX_VERBOSE)
+  String functionName = _className+F("_manageDisconnect()");
+  #endif
+
   if (secondaryIsConnected() && _buffer->getButton(L2) && _buffer->getButton(PS2)) {
     #ifdef BLACBOX_DEBUG
-    output = F("BLACBox_PS3Nav::");
-    output += F("_manageDisconnect - ");
-    output += F("Disconnecting secondary controller.");
+    output = functionName;
+    output += F(" - Disconnecting secondary controller.");
     Serial.println(output);
     #endif
     _secondary.disconnect();
@@ -219,9 +294,8 @@ void BLACBox_PS3Nav::_manageDisconnect() {
 
   if (primaryIsConnected() && _buffer->getButton(L2) && _buffer->getButton(PS)) {
     #ifdef BLACBOX_DEBUG
-    output = F("BLACBox_PS3Nav::");
-    output += F("_manageDisconnect - ");
-    output += F("Disconnecting primary controller.");
+    output = functionName;
+    output += F(" - Disconnecting primary controller.");
     Serial.println(output);
     #endif
     _primary.disconnect();
@@ -238,12 +312,18 @@ void BLACBox_PS3Nav::_manageDisconnect() {
     #endif
     _swapControllers();
   }
+
 };
 
 // ========================
 //      _isConnected()
 // ========================
 bool BLACBox_PS3Nav::_isConnected(PS3BT *controller) {
+
+  #if defined(BLACBOX_DEBUG) || defined (BLACBOX_VERBOSE)
+  String functionName = _className+F("_isConnected()");
+  #endif
+
   return controller->PS3NavigationConnected;
 };
 
@@ -259,6 +339,7 @@ bool BLACBox_PS3Nav::_isConnected(PS3BT *controller) {
 //      _onInitPrimary()
 // ==========================
 static void BLACBox_PS3Nav::_onInitPrimary() {
+
   // This is a static function called by 'attachOnInit'.
   if (BLACBox_PS3Nav::thisController != NULL) {
     BLACBox_PS3Nav::thisController->_onInitValidate(PRIMARY);
@@ -269,6 +350,7 @@ static void BLACBox_PS3Nav::_onInitPrimary() {
 //      _onInitSecondary()
 // ============================
 static void BLACBox_PS3Nav::_onInitSecondary() {
+
   // This is a static function called by 'attachOnInit'.
   if (BLACBox_PS3Nav::thisController != NULL) {
     BLACBox_PS3Nav::thisController->_onInitValidate(SECONDARY);
@@ -279,6 +361,11 @@ static void BLACBox_PS3Nav::_onInitSecondary() {
 //      _onInitValidate
 // =========================
 void BLACBox_PS3Nav::_onInitValidate(uint8_t controllerNumber) {
+
+  #if defined(BLACBOX_DEBUG) || defined (BLACBOX_VERBOSE)
+  String functionName = _className+F("_onInitValidate()");
+  #endif
+
   // This is the non-static function which can call non-static members of the PS3BT class.
   // We cannot pass a pointer to the controller through the arguments. The compiler 
   // again complains about it being non-static. But we can pass the controller number 
@@ -345,6 +432,11 @@ void BLACBox_PS3Nav::_onInitValidate(uint8_t controllerNumber) {
 //      _swapControllers()
 // ============================
 void BLACBox_PS3Nav::_swapControllers() {
+
+  #if defined(BLACBOX_DEBUG) || defined (BLACBOX_VERBOSE)
+  String functionName = _className+F("_swapControllers()");
+  #endif
+
   #ifdef BLACBOX_DEBUG
   output = F("BLACBox_PS3Nav::");
   output += F("_swapControllers - ");
@@ -377,6 +469,10 @@ void BLACBox_PS3Nav::_swapControllers() {
 // ================================
 bool BLACBox_PS3Nav::_detectCriticalFault(PS3BT* controller, uint8_t controllerNumber) {
 
+  #if defined(BLACBOX_DEBUG) || defined (BLACBOX_VERBOSE)
+  String functionName = _className+F("_detectCriticalFault()");
+  #endif
+
   // Skip critical fault detection when the controller is not connected.
   if (!_isConnected(controller) || _faultData[controllerNumber].lastMsgTime <= 0) {
     return false;
@@ -406,9 +502,9 @@ bool BLACBox_PS3Nav::_detectCriticalFault(PS3BT* controller, uint8_t controllerN
 
     if (controllerNumber == PRIMARY) {
       // After 1/2 of a second lag, stop all motors but do not disconnect the controller yet.
-      // I found that processing a command through MarcDuino can take up to 509-510ms, so I reset
-      // the lag time threshold to that level.
-      if (lagTime > 510) {
+      // I found that processing a command through MarcDuino can take up over 500ms, so I reset
+      // the lag time threshold higher.
+      if (lagTime > 750) {
         /*
          * TODO: Work out isFootMotorStopped, isDomeMotorStopped
          */
@@ -416,13 +512,17 @@ bool BLACBox_PS3Nav::_detectCriticalFault(PS3BT* controller, uint8_t controllerN
           #ifdef BLACBOX_DEBUG
           output = F("BLACBox_PS3Nav::");
           output += F("_detectCriticalFault - ");
-          output += F("It has been 510ms since we heard from the primary controller.");
+          output += F("It has been too long since we heard from the primary controller.");
           Serial.println(output);
           _displayTimes(_faultData[controllerNumber].lastMsgTime, currentTime, lagTime);
           output = F("CRITICAL FAULT: Shutting down motors, and watching for a new message.");
           Serial.println(output);
           #endif
-          _stopAllMotors();
+          stopAllMotors();
+          if (controllerNumber == PRIMARY)
+            _resetCriticalFault(&_primary, PRIMARY);
+          else
+            _resetCriticalFault(&_secondary, SECONDARY);
 //        }
         return true;
       }
@@ -440,6 +540,12 @@ bool BLACBox_PS3Nav::_detectCriticalFault(PS3BT* controller, uint8_t controllerN
         Serial.println(output);
         #endif
         controller->disconnect();
+        if (controllerNumber == PRIMARY) {
+          if (!_buffer->isSecondaryConnected()) { _buffer->advanceCycle(); }
+          _resetCriticalFault(&_primary, PRIMARY);
+        } else {
+          _resetCriticalFault(&_secondary, SECONDARY);
+        }
         return true;
       }
     }
@@ -460,8 +566,14 @@ bool BLACBox_PS3Nav::_detectCriticalFault(PS3BT* controller, uint8_t controllerN
         output = F("CRITICAL FAULT: Shutting down dome motor, and disconnecting the controller.");
         Serial.println(output);
         #endif
-        _stopDomeMotor();
+        stopDomeMotor();
         controller->disconnect();
+        if (controllerNumber == PRIMARY) {
+          if (!_buffer->isSecondaryConnected()) { _buffer->advanceCycle(); }
+          _resetCriticalFault(&_primary, PRIMARY);
+        } else {
+          _resetCriticalFault(&_secondary, SECONDARY);
+        }
         return true;
       }
     }
@@ -506,9 +618,15 @@ bool BLACBox_PS3Nav::_detectCriticalFault(PS3BT* controller, uint8_t controllerN
     output = F("CRITICAL FAULT: Disconnecting the controller.");
     Serial.println(output);
     #endif
-    if (controllerNumber == PRIMARY) _stopFootMotors();
-    _stopDomeMotor();
+    if (controllerNumber == PRIMARY) stopFootMotors();
+    stopDomeMotor();
     controller->disconnect();
+    if (controllerNumber == PRIMARY) {
+      if (!_buffer->isSecondaryConnected()) { _buffer->advanceCycle(); }
+      _resetCriticalFault(&_primary, PRIMARY);
+    } else {
+      _resetCriticalFault(&_secondary, SECONDARY);
+    }
     return true;
   }
 
@@ -525,6 +643,11 @@ bool BLACBox_PS3Nav::_detectCriticalFault(PS3BT* controller, uint8_t controllerN
 //      _resetCriticalFault()
 // ===============================
 void BLACBox_PS3Nav::_resetCriticalFault(PS3BT* controller, uint8_t controllerNumber) {
+
+  #if defined(BLACBOX_DEBUG) || defined (BLACBOX_VERBOSE)
+  String functionName = _className+F("_resetCriticalFault()");
+  #endif
+
   _faultData[controllerNumber].badData = 0;
   if (!_isConnected(controller) || controller->getLastMessageTime() == 0)
     _faultData[controllerNumber].lastMsgTime = -1;
@@ -536,45 +659,15 @@ void BLACBox_PS3Nav::_resetCriticalFault(PS3BT* controller, uint8_t controllerNu
 //      _displayTimes()
 // =========================
 void BLACBox_PS3Nav::_displayTimes(unsigned long msgTime, unsigned long currTime, unsigned long lagTime) {
+
+  #if defined(BLACBOX_DEBUG) || defined (BLACBOX_VERBOSE)
+  String functionName = _className+F("_displayTimes()");
+  #endif
+
   output = F("\tlastMsgTime: ");      output += msgTime;
   output += F("\r\n\tcurrentTime: "); output += currTime;
   output += F("\r\n\tlagTime:     "); output += lagTime;
   Serial.println(output);
 }
-
-/* =======================================
- *          Stop motor functions
- * ======================================= */
-
-// ==========================
-//      _stopDomeMotor()
-// ==========================
-void BLACBox_PS3Nav::_stopDomeMotor() {
-/*
- * TODO: Work out isFootMotorStopped, stopFeet()
- * 
-  stopFeet();
- */
-  _buffer->setStatus(FootMotorStopped, true);
-};
-
-// ===========================
-//      _stopFootMotors()
-// ===========================
-void BLACBox_PS3Nav::_stopFootMotors() {
-/*
- * TODO: Work out SyR.stop();
- * 
-  SyR.stop();
- */
-};
-
-// ==========================
-//      _stopAllMotors()
-// ==========================
-void BLACBox_PS3Nav::_stopAllMotors() {
-  _stopFootMotors();
-  _stopDomeMotor();
-};
 
 #endif
