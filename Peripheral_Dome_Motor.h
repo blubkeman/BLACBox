@@ -19,12 +19,20 @@ extern String output;
 /* ===============================================
  *  Dome Controls
  * ===============================================
- *  PS3 Navigation (single or dual)
+ *  PS3 Navigation
+ *
+ *    Single Controller
+ *    -----------------
  *    L2+Cross      = Disable dome automation
  *    L2+Circle     = Enable dome automation
+ *    L2+Nav1 Stick = Rotate dome at variable speed and direction
  *    Cross         = Rotate dome CW at the fixed speed
  *    Circle        = Rotate dome CCW at the fixed speed
- *    L1+Nav1 Stick = Rotate dome at variable speed and direction
+ *
+ *    Dual Controller
+ *    ---------------
+ *    L2+Cross      = Disable dome automation
+ *    L2+Circle     = Enable dome automation
  *    Nav2 Stick    = Rotate dome at variable speed and direction
  * =============================================== */
 
@@ -165,6 +173,7 @@ class Dome_Motor
         // Dome is prepared for a future move - start the turn when ready
         if (_startTurnTime < millis()) {
           _rotationStatus = 2;
+
           #ifdef BLACBOX_DEBUG
           output = _className+functionName;
           output += F(" - Dome Automation: Ready To Start Turn");
@@ -179,6 +188,7 @@ class Dome_Motor
         if (_stopTurnTime > millis()) {
           domeSpeed = DOME_AUTO_SPEED * _turnDirection;
           _Syren.motor(domeSpeed);
+
           #ifdef BLACBOX_DEBUG
           output = functionName;
           output += F(" - Turning Now!!");
@@ -189,6 +199,7 @@ class Dome_Motor
           // turn completed - stop the motor
           _rotationStatus = 0;
           _Syren.stop();
+
           #ifdef BLACBOX_DEBUG
           output = functionName;
           output = F(" - STOP TURN!!");
@@ -215,15 +226,18 @@ class Dome_Motor
       //    L2+Cross  = Disable dome automation
       // ===============================================
 
-      if ( (_buffer->isDomeEnabled()) ) {
+      if ( (_buffer->isDomeAutomationRunning()) ) {
         if ( _buffer->getButton(L2) && _buffer->getButton(SELECT) ) {
           
-          // Disable the dome when commanded.
+          // Disable the dome automation when commanded.
 
-          _buffer->setStatus(Status::DomeMotorEnabled, false);
+          _buffer->setStatus(Status::DomeAutomationRunning, false);
+          _rotationStatus = 0;
+          _targetPosition = 0;
+
           #ifdef BLACBOX_DEBUG
           output = functionName;
-          output += F(" - Disabling dome motor.");
+          output += F(" - Disabling dome automation.");
           Serial.println(output);
           #endif
           return; // Returning keeps the processing time quick.
@@ -231,31 +245,30 @@ class Dome_Motor
       } else {
         if ( _buffer->getButton(L2) && _buffer->getButton(START) ) {
 
-          // Enable the dome when commanded.
+          // Enable the dome automation when commanded.
 
-          _buffer->setStatus(Status::DomeMotorEnabled, true);
+          _buffer->setStatus(Status::DomeAutomationRunning, true);
+
           #ifdef BLACBOX_DEBUG
           output = functionName;
-          output += F(" - Enabling dome motor.");
+          output += F(" - Enabling dome automation.");
           Serial.println(output);
           #endif
         }
         return; // Returning keeps the processing time quick.
       }
   
-
       //Flood control prevention
       //This is intentionally set to double the rate of the Foot Motor Latency
       if ((millis() - _previousMillis) < (2*SERIAL_LATENCY) ) return;  
 
-      // If we get this far, the dome is still enabled.
-      // Now, look for rotation commands.
+      // Look for rotation commands.
 
       // ===============================================
       //  Dome rotation
       // ===============================================
       //    Nav2 Stick    = Rotate dome at variable speed and direction
-      //    L1+Nav1 Stick = Rotate dome at variable speed and direction
+      //    L2+Nav1 Stick = Rotate dome at variable speed and direction
       //    Cross         = Rotate dome CW at the fixed speed while driving
       //    Circle        = Rotate dome CCW at the fixed speed while driving
       // ===============================================
@@ -263,6 +276,7 @@ class Dome_Motor
       int rotationSpeed = 0;
 
       if ( _buffer->isSecondaryConnected() ) {
+
         if ( _buffer->isStickOffCenter(RightHatX) ) {
 
           // Rotate the dome in the direction and speed according to the secondary joystick.
@@ -270,7 +284,7 @@ class Dome_Motor
 
           #ifdef BLACBOX_VERBOSE
           output = functionName;
-          output += F(" - Right stick moved.");
+          output += F(" - Rotate dome (secondary stick).");
           Serial.println(output);
           #endif
         }
@@ -281,26 +295,17 @@ class Dome_Motor
         // is no secondary controller. Priority is given to the stick
         // first then the button controls.
 
-        if ( _buffer->getButton(L1) ) {
+        if ( _buffer->getButton(L2) && _buffer->isStickOffCenter(LeftHatX) ) {
 
-          // Stop the foot motors when L1 is pressed while driving.
+          // Rotate the dome in the direction and speed according to the primary joystick.
+          rotationSpeed = _checkDeadZone(_buffer->getStick(LeftHatX));
 
-          if ( !(_buffer->isFootStopped()) ) {
-            controller.stopFootMotors();
-            return; // Interrupt the command. Let the next loop handle dome rotation.
-          }
+          #ifdef BLACBOX_VERBOSE
+          output = functionName;
+          output += F(" - Rotate dome (primary stick).");
+          Serial.println(output);
+          #endif
 
-          if ( _buffer->isStickOffCenter(LeftHatX) ) {
-
-            // Rotate the dome in the direction and speed according to the primary joystick.
-            rotationSpeed = _checkDeadZone(_buffer->getStick(LeftHatX));
-
-            #ifdef BLACBOX_VERBOSE
-            output = functionName;
-            output += F(" - Left stick moved.");
-            Serial.println(output);
-            #endif
-          }
         } else {
 
           if ( !(_buffer->isButtonModified()) ) {
