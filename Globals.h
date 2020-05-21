@@ -1,6 +1,6 @@
 /*
  * Globals.h - Global variables for the B.L.A.C.Box system
- * Created by Brian Lubkeman, 18 April 2020
+ * Created by Brian Lubkeman, 21 May 2020
  * Inspired by S.H.A.D.O.W. controller code written by KnightShade
  * Released into the public domain.
  */
@@ -39,6 +39,7 @@ enum PanelStatus {
 static int cmd;    // We use this to give directions to peripherals based on controller input.
 static bool runningCustomRoutine = false;
 
+// The following variables are used for debugging.
 String output = "";
 
 #endif

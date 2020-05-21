@@ -1,6 +1,6 @@
 /*
  * Peripheral_Foot_Motor.h - Library for foot motor control for the B.L.A.C.Box system
- * Created by Brian Lubkeman, 18 April 2020
+ * Created by Brian Lubkeman, 21 May 2020
  * Inspired by S.H.A.D.O.W. controller code written by KnightShade
  * Released into the public domain.
 */
@@ -28,6 +28,10 @@ class FootMotor {
     long _currentMillis;
     long _previousMillis;
 
+    #if defined(BLACBOX_DEBUG) || defined (BLACBOX_VERBOSE)
+    String _className;
+    #endif
+
   public:
     // =====================
     //      Constructor
@@ -41,6 +45,11 @@ class FootMotor {
     //        interpretController()
     // ===================================
     virtual void interpretController() {
+
+      #if defined(BLACBOX_DEBUG) || defined (BLACBOX_VERBOSE)
+      String functionName = _className+F("interpretController()");
+      #endif
+
       // Check for enabling/disabling the stick.
       if (_buffer->getButton(PS)) {
         if (_buffer->getButton(SELECT)) { _buffer->setStatus(FootMotorEnabled, true); }
@@ -68,6 +77,66 @@ class FootMotor {
     virtual void stopFeet();
 };
 
+class Roboteq_FootMotor : public FootMotor {
+
+  private:
+    ??? _roboteq;
+
+  public:
+    // =====================
+    //      Constructor
+    // =====================
+    Roboteq_FootMotor(Buffer* pBuffer) : _roboteq {
+      _buffer = pBuffer;
+
+      #if defined(BLACBOX_DEBUG) || defined (BLACBOX_VERBOSE)
+      _className = F("Sabertooth_FootMotor::");
+      #endif
+
+    };
+
+    // =====================
+    //        begin()
+    // =====================
+    void begin() {
+
+      #if defined(BLACBOX_DEBUG) || defined (BLACBOX_VERBOSE)
+      String functionName = _className+F("begin()");
+      #endif
+
+      _roboteq.autobaud();       // Send the autobaud command to the Sabertooth controller(s).
+      _roboteq.setTimeout(300);  // DMB:  How low can we go for safety reasons?  multiples of 100ms
+      _roboteq.setDeadband(DRIVE_DEAD_BAND_RANGE);
+      stopFeet();
+
+      #ifdef BLACBOX_DEBUG
+      output = functionName;
+      output += F(" - Roboteq/Q85 foot motors started.");
+      Serial.println(output));
+      #endif
+    };
+
+    // ===========================
+    //        stopFeet()
+    // ===========================
+    virtual void stopFeet() {
+
+      #if defined(BLACBOX_DEBUG) || defined (BLACBOX_VERBOSE)
+      String functionName = _className+F("stopFeet()");
+      #endif
+
+      _roboteq.stop();
+      _buffer->setStatus(FootMotorStopped, true);
+    };
+
+    // ==============================
+    //        calculateDrive()
+    // ==============================
+    virtual void calculateDrive() {
+      
+    };
+};
+
 class Sabertooth_FootMotor : public FootMotor {
 
   private:
@@ -79,18 +148,31 @@ class Sabertooth_FootMotor : public FootMotor {
     // =====================
     Sabertooth_FootMotor(Buffer* pBuffer) : _sabertooth(SABERTOOTH_ADDR, Serial2) {
       _buffer = pBuffer;
+
+      #if defined(BLACBOX_DEBUG) || defined (BLACBOX_VERBOSE)
+      _className = F("Sabertooth_FootMotor::");
+      #endif
+
     };
+
     // =====================
     //        begin()
     // =====================
     void begin() {
+
+      #if defined(BLACBOX_DEBUG) || defined (BLACBOX_VERBOSE)
+      String functionName = _className+F("begin()");
+      #endif
+
       _sabertooth.autobaud();       // Send the autobaud command to the Sabertooth controller(s).
       _sabertooth.setTimeout(300);  // DMB:  How low can we go for safety reasons?  multiples of 100ms
       _sabertooth.setDeadband(DRIVE_DEAD_BAND_RANGE);
       stopFeet();
 
       #ifdef BLACBOX_DEBUG
-      Serial.println(F("Sabertooth foot motors started."));
+      output = functionName;
+      output += F(" - Sabertooth foot motors started.");
+      Serial.println(output));
       #endif
     };
 
@@ -98,6 +180,11 @@ class Sabertooth_FootMotor : public FootMotor {
     //        stopFeet()
     // ===========================
     virtual void stopFeet() {
+
+      #if defined(BLACBOX_DEBUG) || defined (BLACBOX_VERBOSE)
+      String functionName = _className+F("stopFeet()");
+      #endif
+
       _sabertooth.stop();
       _buffer->setStatus(FootMotorStopped, true);
     };
@@ -106,6 +193,10 @@ class Sabertooth_FootMotor : public FootMotor {
     //        calculateDrive()
     // ==============================
     virtual void calculateDrive() {
+
+      #if defined(BLACBOX_DEBUG) || defined (BLACBOX_VERBOSE)
+      String functionName = _className+F("calculateDrive()");
+      #endif
 
       _buffer->setStatus(FootMotorEnabled, false);
       int joystickPosition = _buffer->getStick(LeftHatY);
@@ -156,7 +247,8 @@ class Sabertooth_FootMotor : public FootMotor {
       if ( (_currentMillis - _previousMillis) > SERIAL_LATENCY  ) {
         #ifdef BLACBOX_VERBOSE
         if ( footDriveSpeed < -driveDeadBandRange || footDriveSpeed > driveDeadBandRange) {
-          output += "Driving Droid at footSpeed: ";
+          output = functionName;
+          output += " - Driving Droid at footSpeed: ";
           output += footDriveSpeed;
           output += "!  DriveStick is Enabled\r\n";
           output += "Joystick: ";              
@@ -169,6 +261,7 @@ class Sabertooth_FootMotor : public FootMotor {
           output += footDriveSpeed;
           output += " Time of command: ";              
           output += millis();
+          Serial.println(output);
         }
         #endif
       }
@@ -200,12 +293,22 @@ class RC_FootMotor : public FootMotor {
     // =====================
     RC_FootMotor(Buffer* pBuffer) {
       _buffer = pBuffer;
+
+      #if defined(BLACBOX_DEBUG) || defined (BLACBOX_VERBOSE)
+      _className = F("RC_FootMotor::");
+      #endif
+
     };
 
     // =====================
     //        begin()
     // =====================
     void begin() {
+
+      #if defined(BLACBOX_DEBUG) || defined (BLACBOX_VERBOSE)
+      String functionName = _className+F("begin()");
+      #endif
+
       _leftFootSignal.attach(LEFT_FOOT_PIN);
       _rightFootSignal.attach(RIGHT_FOOT_PIN);
       
@@ -216,7 +319,9 @@ class RC_FootMotor : public FootMotor {
       stopFeet();
 
       #ifdef BLACBOX_DEBUG
-      Serial.println(F("RC foot motors started."));
+      output = functionName;
+      output += F(" - RC foot motors started.");
+      Serial.println(output);
       #endif
     };
 
@@ -224,6 +329,11 @@ class RC_FootMotor : public FootMotor {
     //        stopFeet()
     // ===========================
     virtual void stopFeet() {
+
+      #if defined(BLACBOX_DEBUG) || defined (BLACBOX_VERBOSE)
+      String functionName = _className+F("stopFeet()");
+      #endif
+
       _leftFootSignal.write(90);
       _rightFootSignal.write(90);
       _buffer->setStatus(FootMotorStopped, true);
@@ -233,6 +343,10 @@ class RC_FootMotor : public FootMotor {
     //        calculateDrive()
     // ==============================
     virtual void calculateDrive() {
+
+      #if defined(BLACBOX_DEBUG) || defined (BLACBOX_VERBOSE)
+      String functionName = _className+F("calculateDrive()");
+      #endif
 
       // Experimental Q85. Untested Madness!!! Use at your own risk and 
       // expect your droid to run away in flames.
@@ -254,99 +368,108 @@ class RC_FootMotor : public FootMotor {
     //        mixBHD()
     // ======================
     void mixBHD(byte stickX, byte stickY, byte maxDriveSpeed) { 
-      
-    //maxDriveSpeed should be between 90 and 180
 
-    // This is BigHappyDude's mixing function, for differential (tank) style 
-    // drive using two motor controllers.
-    // Takes a joysticks X and Y values, mixes using the diamind mix, and 
-    // output a value 0-180 for left and right motors.     
-    // 180,180 = both feet full speed forward.
-    // 000,000 = both feet full speed reverse.
-    // 180,000 = left foot full forward, right foot full reverse (spin droid clockwise)
-    // 000,180 = left foot full reverse, right foot full forward (spin droid counter-clockwise)
-    // 090,090 = no movement
-    // for simplicity, we think of this diamond matrix as a range from -100 to +100,
-    // then map the final values to servo range (0-180) at the end 
-    // Ramping and Speed mode applied on the droid.
+      #if defined(BLACBOX_DEBUG) || defined (BLACBOX_VERBOSE)
+      String functionName = _className+F("mixBHD()");
+      #endif
+
+      //maxDriveSpeed should be between 90 and 180
+
+      // This is BigHappyDude's mixing function, for differential (tank) style 
+      // drive using two motor controllers.
+      // Takes a joysticks X and Y values, mixes using the diamind mix, and 
+      // output a value 0-180 for left and right motors.     
+      // 180,180 = both feet full speed forward.
+      // 000,000 = both feet full speed reverse.
+      // 180,000 = left foot full forward, right foot full reverse (spin droid clockwise)
+      // 000,180 = left foot full reverse, right foot full forward (spin droid counter-clockwise)
+      // 090,090 = no movement
+      // for simplicity, we think of this diamond matrix as a range from -100 to +100,
+      // then map the final values to servo range (0-180) at the end 
+      // Ramping and Speed mode applied on the droid.
     
-    // If movement outside deadzone
-    if(((stickX <= 113) || (stickX >= 141)) || ((stickY <= 113) || (stickY >= 141))) {
+      if(((stickX > 113) && (stickX < 141)) && ((stickY > 113) && (stickY < 141))) {
 
-      //  Map to easy grid -100 to 100 in both axis, including deadzones.
+        // Movement is inside stick deadzone
 
-      int YDist = 0;  // set to 0 as a default value if no if used.
-      int XDist = 0;
-
-      if(stickY <= 113)
-        YDist = (map(stickY, 0, 113, 100, 1));     //  Map the up direction stick value to Drive speed
-      else if(stickY >= 141)
-        YDist = (map(stickY, 141, 255, -1, -100)); //  Map the down direction stick value to Drive speed
-
-      if(stickX <= 113)
-        XDist = (map(stickX, 0, 113, -100, -1));   //  Map the left direction stick value to Turn speed
-      else if(stickX >= 141)
-        XDist = (map(stickX, 141, 255, 1, 100));   //  Map the right direction stick value to Turn speed
-
-      //  Constrain to Diamond values.  using 2 line equations and find the intersect, boiled down to the minimum
-      //  This was the inspiration; https://github.com/declanshanaghy/JabberBot/raw/master/Docs/Using%20Diamond%20Coordinates%20to%20Power%20a%20Differential%20Drive.pdf 
-
-      float TempYDist = YDist;
-      float TempXDist = XDist;
-
-      // If outside top left. Equation of line is y=x+Max, so if y > x+Max then it is above line
-      if ( YDist > (XDist + 100) ) {
-
-        // OK, the first fun bit.
-        // For the 2 lines, this is always true: y = m1*x + b1 and y = m2*x - b2
-        // y - y = m1*x + b1  - m2*x - b2  or 0 = (m1 - m2)*x + b1 - b2
-        // We have y = x+100 and y = ((change in y)/Change in x))x
-        // So:   x = -100/(1-(change in y)/Change in x)) and using y = x+100 we can find y with the new x
-        // Not too bad when simplified. :P
-        TempXDist = -100 / (1 - (TempYDist / TempXDist));
-        TempYDist = TempXDist + 100;
-
-      } else if (YDist > (100 - XDist)) {  //  if outside top right
-
-        // repeat intesection for y = 100 - x
-        TempXDist = -100 / (-1 - (TempYDist / TempXDist));
-        TempYDist = -TempXDist + 100;
-
-      } else if (YDist<(-XDist-100)) {  //  if outside bottom left
-
-        // repeat intesection for y = -x - 100
-        TempXDist = 100/(-1-(TempYDist/TempXDist));
-        TempYDist = -TempXDist-100;
-
-      } else if (YDist<(XDist-100)) {  //  if outside bottom right
-
-        // repeat intesection for y = x - 100
-        TempXDist = 100/(1-(TempYDist/TempXDist));
-        TempYDist = TempXDist-100;
-
-      }
-
-      //  all coordinates now in diamond. next translate to the diamond coordinates.
-      //  for the left.  send ray to y = x + Max from coordinates along y = -x + b
-      //  find for b, solve for coordinates and resut in y then scale using y = (y - max/2)*2
-      float LeftSpeed = ((TempXDist+TempYDist-100)/2)+100;
-      LeftSpeed = (LeftSpeed-50)*2;
-
-      //  for right send ray to y = -x + Max from coordinates along y = x + b find intersction coordinates and then use the Y vaule and scale.
-      float RightSpeed = ((TempYDist-TempXDist-100)/2)+100;
-      RightSpeed = (RightSpeed-50)*2;
-
-      // this all results in a -100 to 100 range of speeds, so shift to servo range...
-      //  eg. for a maxDriveSpeed of 140, we'd need the value to map to between 40 and 140
-      //  eg. for a maxDriveSpeed of 180, we'd need the value to map to between 0 and 180
-      //_leftFoot=map(LeftSpeed, -100, 100, (180-maxDriveSpeed), maxDriveSpeed);
-      //_rightFoot=map(RightSpeed, -100, 100, (180-maxDriveSpeed), maxDriveSpeed);
-      _leftFoot=map(LeftSpeed, -100, 100, maxDriveSpeed, (180-maxDriveSpeed) );
-      _rightFoot=map(RightSpeed, -100, 100, maxDriveSpeed, (180-maxDriveSpeed) );
-
-      } else {
         _leftFoot=90;
         _rightFoot=90;
+
+      } else {
+
+        // Movement is outside stick deadzone
+
+        // Map to easy grid -100 to 100 in both axis, including deadzones.
+
+        int YDist = 0;  // set to 0 as a default value if no if used.
+        int XDist = 0;
+  
+        if(stickY <= 113)
+          YDist = (map(stickY, 0, 113, 100, 1));     //  Map the up direction stick value to Drive speed
+        else if(stickY >= 141)
+          YDist = (map(stickY, 141, 255, -1, -100)); //  Map the down direction stick value to Drive speed
+  
+        if(stickX <= 113)
+          XDist = (map(stickX, 0, 113, -100, -1));   //  Map the left direction stick value to Turn speed
+        else if(stickX >= 141)
+          XDist = (map(stickX, 141, 255, 1, 100));   //  Map the right direction stick value to Turn speed
+  
+        // Constrain to Diamond values.  using 2 line equations and find the intersect, boiled down to the minimum
+        // This was the inspiration; https://github.com/declanshanaghy/JabberBot/raw/master/Docs/Using%20Diamond%20Coordinates%20to%20Power%20a%20Differential%20Drive.pdf 
+  
+        float TempYDist = YDist;
+        float TempXDist = XDist;
+  
+        // If outside top left. Equation of line is y=x+Max, so if y > x+Max then it is above line
+        if ( YDist > (XDist + 100) ) {
+  
+          // OK, the first fun bit.
+          // For the 2 lines, this is always true: y = m1*x + b1 and y = m2*x - b2
+          // y - y = m1*x + b1  - m2*x - b2  or 0 = (m1 - m2)*x + b1 - b2
+          // We have y = x+100 and y = ((change in y)/Change in x))x
+          // So:   x = -100/(1-(change in y)/Change in x)) and using y = x+100 we can find y with the new x
+          // Not too bad when simplified. :P
+          TempXDist = -100 / (1 - (TempYDist / TempXDist));
+          TempYDist = TempXDist + 100;
+  
+        } else if (YDist > (100 - XDist)) {  //  if outside top right
+  
+          // repeat intesection for y = 100 - x
+          TempXDist = -100 / (-1 - (TempYDist / TempXDist));
+          TempYDist = -TempXDist + 100;
+  
+        } else if (YDist<(-XDist-100)) {  //  if outside bottom left
+  
+          // repeat intesection for y = -x - 100
+          TempXDist = 100/(-1-(TempYDist/TempXDist));
+          TempYDist = -TempXDist-100;
+  
+        } else if (YDist<(XDist-100)) {  //  if outside bottom right
+  
+          // repeat intesection for y = x - 100
+          TempXDist = 100/(1-(TempYDist/TempXDist));
+          TempYDist = TempXDist-100;
+  
+        }
+
+        // all coordinates now in diamond. next translate to the diamond coordinates.
+        // for the left.  send ray to y = x + Max from coordinates along y = -x + b
+        // find for b, solve for coordinates and resut in y then scale using y = (y - max/2)*2
+        float LeftSpeed = ((TempXDist+TempYDist-100)/2)+100;
+        LeftSpeed = (LeftSpeed-50)*2;
+  
+        // for right send ray to y = -x + Max from coordinates along y = x + b find intersction coordinates and then use the Y vaule and scale.
+        float RightSpeed = ((TempYDist-TempXDist-100)/2)+100;
+        RightSpeed = (RightSpeed-50)*2;
+  
+        // this all results in a -100 to 100 range of speeds, so shift to servo range...
+        //  eg. for a maxDriveSpeed of 140, we'd need the value to map to between 40 and 140
+        //  eg. for a maxDriveSpeed of 180, we'd need the value to map to between 0 and 180
+        //_leftFoot=map(LeftSpeed, -100, 100, (180-maxDriveSpeed), maxDriveSpeed);
+        //_rightFoot=map(RightSpeed, -100, 100, (180-maxDriveSpeed), maxDriveSpeed);
+        _leftFoot=map(LeftSpeed, -100, 100, maxDriveSpeed, (180-maxDriveSpeed) );
+        _rightFoot=map(RightSpeed, -100, 100, maxDriveSpeed, (180-maxDriveSpeed) );
+  
       }
     }
 
