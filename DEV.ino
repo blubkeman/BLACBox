@@ -1,7 +1,7 @@
 /* =================================================================================
  *    B.L.A.C.Box: Brian Lubkeman's Astromech Controller
  * =================================================================================
- *                          Last Revised Date: 18 April 2020
+ *                          Last Revised Date: 21 May 2020
  *                          Revised By: Brian E. Lubkeman
  *  Inspired by the PADAWAN (danf), SHADOW (KnightShade), SHADOW_MD (vint43) effort
  * =================================================================================
@@ -32,9 +32,11 @@
  *   4. In progress - Support the Marcduino system.
  *   5. In progress - Support sound sent to the optional Marcduino body master.
  *   6. In progress - Support dome motor control using a Syren 10.
- *   7. In progress - Support foot motor control using Roboteq 1360/2360 for Q85 motors.
- *   8. In progress - Support foot motor control using Sabertooth.
- *   9. Future - Support I2C-based peripheral as substitutions for Marcduino.
+ *   7. In progress - Support foot motor control using R/C without mixing (Roboteq 2360).
+ *   8. Future - Support foot motor control using Sabertooth.
+ *   9. Future - Support foot motor control using R/C with mixing (Roboteq SBL1360).
+ *   10. Future - Support I2C-based peripherals.
+ *   11. Future - Support additional controllers available through the USB Host Shield code.
  *
  * =======================================================================================
  * 
@@ -60,9 +62,9 @@
 
 // ------------------------
 // This is our control buffer. This is what allows us to decouple the controller
-// code from the peripheral code. In other words, I should be able to swap
-// controller types from PS3 Nav to PS3 or PS4 when I can create an appropriate
-// header file for said controller without rewriting all the peripheral code.
+// code from the peripheral code. With this, I should be able to swap controllers
+// from PS3 Nav to PS3 or PS4 after I create the appropriate header file and code
+// for said controller and without rewriting all the peripheral code.
 // ------------------------
 #include "Buffer.h"
 Buffer controlBuffer;
@@ -72,39 +74,45 @@ Buffer controlBuffer;
 // controller. By using the USB Host Shield Library 2.0, we should be able to implement
 // any controller that library supports including the PS3, PS4, Xbox, and Wii.
 // ------------------------
+#ifdef PS3_NAVIGATION
 #include "Controller_PS3Nav.h"
 BLACBox_PS3Nav controller(&controlBuffer);
-
 // This pointer helps us with the attachOnInit functions.
 BLACBox_PS3Nav* BLACBox_PS3Nav::thisController = { NULL };
+#endif
 
 // ------------------------
 // This is our dome motor.  It supports the Syren 10 motor controller.
 // ------------------------
 #ifdef DOME
   #include "Peripheral_Dome_Motor.h"
-  Dome_Motor domeMotor;
+  Dome_Motor domeMotor(&controlBuffer);
 #endif
 
 // ------------------------
-// This is our foot motor controller.
+// This is our foot motor controller.  It supports the Roboteq SBL2360.
+// Code exists for the Sabertooth and Roboteq SBL1360 or other R/C controller
+// that requires BHD mixing, but these have not been tested.
 // ------------------------
 #ifdef DRIVE
   #include "Peripheral_Foot_Motors.h"
-  #if FOOT_CONTROLLER == 0
+  #if FOOT_CONTROLLER == 2
+    // This supports the Roboteq SBL2360 motor controllers.
+    Roboteq_FootMotor footMotors(&controlBuffer);
+  #elif FOOT_CONTROLLER == 1
+    // This supports the Roboteq SBL1360 or other R/C motor controllers.
+    RC_FootMotor footMotors(&controlBuffer);
+  #elif FOOT_CONTROLLER == 0
     // This supports the Sabertooth motor controller.
     // Commands are passed through the Syren to the Sabertooth.
     Sabertooth_FootMotor footMotors(&controlBuffer);
-  #elif FOOT_CONTROLLER == 1
-    // This supports the Roboteq SBL1360/SBL2360 motor controllers.
-    RC_FootMotor footMotors(&controlBuffer);
   #endif
 #endif
 
 // ------------------------
 // This is our sound, logic display, holoprojectors, dome panels, and body panels.
-//   The Marcduino system is supported.  I hope to support a future alternative to
-//   that using I2C.
+//   The Marcduino system is supported.  I hope to support a future alternative
+//   that uses I2C.
 //   This is very much a work in progress.
 // ------------------------
 #ifdef MARCDUINO
@@ -153,7 +161,7 @@ void setup() {
   marcduino.begin();
   #endif
 
-  #ifdef BLACBOX_DEBUG
+  #if defined(BLACBOX_DEBUG) || defined(BLACBOX_VERBOSE)
   output.reserve(200); // Reserve 200 bytes for the output string
   #endif
 
@@ -165,38 +173,34 @@ void loop() {
    *      DRIVE/STEERING
    * ======================== */
   #ifdef DRIVE
-    if ( !controller.read() ) {
-      // We have a fault condition.  Do NOT process any controller data!
-      return;
-    }
+  if ( (controller.read()) ) {
+    // This is skipped when we have a fault condition.
     footMotors.interpretController();
+  }
   #endif
 
   /* =======================
    *      DOME ROTATION
    * ======================= */
   #ifdef DOME
-    if ( !controller.read() ) {
-      // We have a fault condition.  Make sure we do NOT process any controller data!
-      return;
-    }
+  if ( (controller.read()) ) {
+    // This is skipped when we have a fault condition.
     domeMotor.interpretController();
     if (controlBuffer.isDomeAutomationRunning())
       domeMotor.automation();
+  }
   #endif
 
   /* ===========================
    *      OTHER PERIPHERALS
    * =========================== */
   #ifdef MARCDUINO
-    if ( !controller.read() ) {
-      // We have a fault condition.  Make sure we do NOT process any controller data!
-      return;
-    }
+  if ( (controller.read()) ) {
+    // This is skipped when we have a fault condition.
     marcduino.interpretController();
-    if (controlBuffer.isCustomDomePanelRunning()) {
+    if (controlBuffer.isCustomDomePanelRunning())
       marcduino.runCustomPanelSequence();
-    }
+  }
   #endif
 
 }
