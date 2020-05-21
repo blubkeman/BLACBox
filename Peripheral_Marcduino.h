@@ -1,6 +1,6 @@
 /*
  * Peripheral_Marcduino.h - Library for Marcduino integration for the B.L.A.C.Box system
- * Created by Brian Lubkeman, 18 April 2020
+ * Created by Brian Lubkeman, 21 May 2020
  * Inspired by S.H.A.D.O.W. controller code written by KnightShade
  * Released into the public domain.
 */
@@ -31,8 +31,6 @@ class Marcduino {
 
   private:
     Buffer* _buffer;
-    String _namespace;
-    String _functionName;
     CustomFunctions_Struct _myFunction;
     PanelSettings_Struct   _myPanels[NUMBER_OF_DOME_PANELS];
     PanelState_Struct      _panelState[NUMBER_OF_DOME_PANELS];
@@ -43,13 +41,17 @@ class Marcduino {
     int8_t _getStandardFunctionIndex();
     int8_t _getCustomFunctionIndex(uint8_t);
     int8_t _getPanelRoutineIndex(uint8_t);
-    String _get_pgm_string(const char *tableValue);
+    String _getPgmString(const char *tableValue);
     void _setMyFunction(uint8_t, uint8_t);
     uint8_t _setPanelState(uint8_t);
     
   // For automation
     unsigned long _randomSeconds[3];
     unsigned long _lastRandomTime[3];
+
+    #if defined(BLACBOX_DEBUG) || defined (BLACBOX_VERBOSE)
+    String _className;
+    #endif
 
   public:
     // =====================
@@ -58,7 +60,11 @@ class Marcduino {
     Marcduino(Buffer* pBuffer) {
       _buffer = pBuffer;
       _buffer->setStatus(Status::CustomDomePanelRunning, false);
-      _namespace = F("Marcduino::");
+
+      #if defined(BLACBOX_DEBUG) || defined (BLACBOX_VERBOSE)
+      _className = F("Marcduino::");
+      #endif
+
     };
 
     // ================
@@ -66,22 +72,25 @@ class Marcduino {
     // ================
     void begin() {
 
-      String _functionName = _namespace+F("begin()");
+      #if defined(BLACBOX_DEBUG) || defined (BLACBOX_VERBOSE)
+      String functionName = _className+F("begin()");
+      #endif
 
       #ifdef BLACBOX_DEBUG
-      Serial.println(_functionName);
-      #ifndef MD_BODY_MASTER
-      Serial.println(F("  Dome master defined."));
-      #else
-      Serial.print(F("  Dome and body master defined. Sound to "));
-      #ifndef MD_BODY_SOUND
-      Serial.print(F("dome"));
-      #else
-      Serial.print(F("body"));
+      output += F(" - Marcduino system started.");
+        #ifndef MD_BODY_MASTER
+        output += F("\r\n  Dome master defined.");
+        #else
+        output += F("\r\n  Dome and body master defined. Sound to ");
+          #ifndef MD_BODY_SOUND
+          output += F("dome");
+          #else
+          output += F("body");
+          #endif
+        output += F(" master.");
+        #endif
       #endif
-      Serial.println(F(" master."));
-      #endif
-      #endif
+      Serial.println(functionName+output);
     };
 
     // ==============================
@@ -89,13 +98,14 @@ class Marcduino {
     // ==============================
     void interpretController() {
 
-      String _functionName = _namespace+F("interpretController()");
+      #if defined(BLACBOX_DEBUG) || defined (BLACBOX_VERBOSE)
+      String functionName = _className+F("interpretController()");
+      #endif
 
       // Enter quiet mode if we lose the controllers.
       if (_buffer->getCycle() == 2) {
         #ifdef BLACBOX_DEBUG
-        Serial.println(_functionName);
-        Serial.println(F("  No controller. Quiet mode."));
+        Serial.println(functionName+ F(" - No controller. Quiet mode."));
         #endif
         _runStandardFunction(standardFunctions[3]);
         return;
@@ -104,13 +114,9 @@ class Marcduino {
       int8_t sfIdx = _getStandardFunctionIndex();
 
       // Stop processing when there is no valid buttons pressed.
-      if (sfIdx < 0 || sfIdx >= sizeof(functionTypes)) { return; }
-
-      #ifdef BLACBOX_VERBOSE
-      Serial.println(_functionName);
-      output = F("  Function type known");
-      Serial.println(output);
-      #endif
+      if (sfIdx < 0 || sfIdx >= sizeof(functionTypes)) {
+        return;
+      }
 
       if (functionTypes[sfIdx] == 0)
         _runStandardFunction(standardFunctions[sfIdx]);
@@ -124,7 +130,9 @@ class Marcduino {
     // ======================
     void automation() {
 
-      String _functionName = _namespace+F("automation()");
+      #if defined(BLACBOX_DEBUG) || defined (BLACBOX_VERBOSE)
+      String functionName = _className+F("automation()");
+      #endif
 
       // Holoprojector automation
 
@@ -153,11 +161,12 @@ class Marcduino {
     // ==============================
     void runCustomPanelSequence() {
 
-      String _functionName = _namespace+F("runCustomPanelSequence()");
+      #if defined(BLACBOX_DEBUG) || defined (BLACBOX_VERBOSE)
+      String functionName = _className+F("runCustomPanelSequence()");
+      #endif
 
       #ifdef BLACBOX_VERBOSE
-      Serial.println(_functionName);
-      Serial.println(F("  Running custom routine"));
+      Serial.println(functionName+F(" - Running custom routine"));
       #endif
 
       String cmd;
@@ -205,7 +214,9 @@ class Marcduino {
 // ================================
 void Marcduino::_runStandardFunction(uint8_t f) {
 
-  String _functionName = _namespace+F("_runStandardFunction()");
+  #if defined(BLACBOX_DEBUG) || defined (BLACBOX_VERBOSE)
+  String functionName = _className+F("_runStandardFunction()");
+  #endif
 
   // Do nothing when given an invalid function number.
 
@@ -213,71 +224,81 @@ void Marcduino::_runStandardFunction(uint8_t f) {
 
   uint8_t idx = f-1;
 
-  #ifdef BLACBOX_DEBUG
-  Serial.println(_functionName);
-  output = F("  Function: "); output += f;
-  Serial.println(output);
-  #endif
-
   #ifndef MD_BODY_MASTER
 
   // Only a dome master exists. Send it everything except body panel commands.
 
   if (f < 54 || f > 75)
-    _sendToDome(_get_pgm_string(table_stdCmd[f]));
+    _sendToDome(_getPgmString(table_stdCmd[f]));
 
   #else
-  #ifndef MD_BODY_SOUND
-
-  // Both dome and body master exist, but sound is still sent to the dome master.
-  // Send everything to the dome master except body panel commands.
-
-  if (f < 54 || f > 75)
-    _sendToDome(_get_pgm_string(table_stdCmd[f]));
-  else
-    _sendToBody(_get_pgm_string(table_stdCmd[f]));
-
-  #else
-
-  // Both dome and body master exist, but sound is sent to the body master.
-
-  if (f >= 2 && f <= 14) {
-    
-    _sendToDome(_get_pgm_string(table_domeCmd[f-2]));
-    _sendToBody(_get_pgm_string(table_bodyCmd[f-2]));
-    
-  } else if (f >= 54 && f <= 75)
-
-    // Send body panel commands to the body master.
-
-    _sendToBody(_get_pgm_string(table_stdCmd[f]));
-
-  else
-
-    // Send everything else to the dome master.
-
-    _sendToDome(_get_pgm_string(table_stdCmd[f]));
-
-  #endif
-
-  #ifdef BLACBOX_VERBOSE
-  Serial.print(tbl_stdDescr[f]);
-  #endif
-
+    #ifndef MD_BODY_SOUND
+  
+    // Both dome and body master exist, but sound is still sent to the dome master.
+    // Send everything to the dome master except body panel commands.
+  
+    if (f < 54 || f > 75)
+      _sendToDome(_getPgmString(table_stdCmd[f]));
+    else
+      _sendToBody(_getPgmString(table_stdCmd[f]));
+  
+    #else
+  
+    // Both dome and body master exist, but sound is sent to the body master.
+  
+    if (f >= 2 && f <= 14) {
+  
+      // Send sound to the body master and the rest to the dome master.
+  
+      _sendToDome(_getPgmString(table_domeCmd[f-2]));
+      _sendToBody(_getPgmString(table_bodyCmd[f-2]));
+      
+    } else if (f >= 54 && f <= 75)
+  
+      // Send body panel commands to the body master.
+  
+      _sendToBody(_getPgmString(table_stdCmd[f]));
+  
+    else
+  
+      // Send everything else to the dome master.
+  
+      _sendToDome(_getPgmString(table_stdCmd[f]));
+  
+    #endif
   #endif
   
+  #ifdef BLACBOX_VERBOSE
+  output = functionName;
+  Serial.println(output);
+  output = F("  Function: ");
+  output += f;
+  Serial.println(output);
+  output = F("  Std Descr: ");
+  output += _getPgmString(table_stdDescr[f]);
+  Serial.println(output);
+  #endif
+
 };
 
 // =======================
 //      _sendToBody()
 // =======================
 void Marcduino::_sendToBody(String in) {
+
+  #if defined(BLACBOX_DEBUG) || defined (BLACBOX_VERBOSE)
+  String functionName = _className+F("_sendToBody()");
+  #endif
+
   Serial3.print(in);
 
   #ifdef BLACBOX_DEBUG
-  Serial.print(F("  Body Command: "));
-  Serial.print(in);
-  Serial.println(F("\\r"));
+  output = functionName;
+  Serial.println(output);
+  output = F("  Body Command: ");
+  output += in;
+  output += F("\\r");
+  Serial.println(output);
   #endif
 };
 
@@ -285,12 +306,20 @@ void Marcduino::_sendToBody(String in) {
 //      _sendToDome()
 // =======================
 void Marcduino::_sendToDome(String in) {
+
+  #if defined(BLACBOX_DEBUG) || defined (BLACBOX_VERBOSE)
+  String functionName = _className+F("_sendToDome()");
+  #endif
+
   Serial1.print(in);
 
   #ifdef BLACBOX_DEBUG
-  Serial.print(F("  Dome Command: "));
-  Serial.print(in);
-  Serial.println(F("\\r"));
+  output = functionName;
+  Serial.println(output);
+  output = F("  Dome Command: ");
+  output += in;
+  output += F("\\r");
+  Serial.println(output);
   #endif
 };
 
@@ -299,7 +328,9 @@ void Marcduino::_sendToDome(String in) {
 // ==============================
 void Marcduino::_runCustomFunction(uint8_t inIdx) {
 
-  String _functionName = _namespace+F("_runCustomFunction()");
+  #if defined(BLACBOX_DEBUG) || defined (BLACBOX_VERBOSE)
+  String functionName = _className+F("_runCustomFunction()");
+  #endif
 
   // Get the index for the custom function array
   int8_t cfIdx = _getCustomFunctionIndex(inIdx);
@@ -307,24 +338,22 @@ void Marcduino::_runCustomFunction(uint8_t inIdx) {
   // Validate the custom function index
   if (cfIdx < 0) {
     #ifdef BLACBOX_DEBUG
-    Serial.println(_functionName);
-    Serial.println(F("  Custom function type defined but not found"));
+    Serial.println(functionName+F(" - Custom function type defined but not found"));
     #endif
     return;
   } else if (cfIdx >= sizeof(customFunctions)) {
     #ifdef BLACBOX_DEBUG
-    Serial.println(_functionName);
-    Serial.println(F("  Custom function index exceeds array size"));
+    Serial.println(functionName+F(" - Custom function index exceeds array size"));
     #endif
     return;
   }
 
+  #ifdef BLACBOX_DEBUG
+  Serial.println(functionName);
+  #endif
+
   // Get the custom function settings.
   _setMyFunction(inIdx, cfIdx);
-
-  #ifdef BLACBOX_DEBUG
-  Serial.println(_functionName);
-  #endif
 
   String soundCmd = "";
   String panelCmd = "";
@@ -346,18 +375,15 @@ void Marcduino::_runCustomFunction(uint8_t inIdx) {
     Serial1.print(soundCmd);
 
     #ifdef BLACBOX_DEBUG
-    Serial.println(_functionName);
     output = F("  Sound Command: ");
     output += soundCmd;
     output += F("\\r");
     Serial.println(output);
-
     #ifdef BLACBOX_VERBOSE
-    output = "  Sound descr: bank 8 track ";
+    output = F("  Sound Descr: bank 8 track ");
     output += track;
     Serial.println(output);
     #endif
-
     #endif
   }
 
@@ -368,7 +394,7 @@ void Marcduino::_runCustomFunction(uint8_t inIdx) {
   f = _myFunction.panelFunction;
   if (f > 0 && f < 9) {
     // Run a predesigned panel sequence
-    panelCmd = _get_pgm_string(table_panelCmd[f]);
+    panelCmd = _getPgmString(table_panelCmd[f]);
 
     // Close all the panels prior to next custom routine
     Serial1.print(table_stdCmd[33]);
@@ -380,12 +406,11 @@ void Marcduino::_runCustomFunction(uint8_t inIdx) {
     #ifdef BLACBOX_DEBUG
     output = F("  Panel Command: ");
     output += panelCmd;
-    output += "\\r";
+    output += F("\\r");
     Serial.println(output);
     #ifdef BLACBOX_VERBOSE
-    Serial.println(_functionName);
-    output = "  Panel descr: ";
-    output += table_panelDescr[f];
+    output = F("  Panel Descr: ");
+    output += _getPgmString(table_panelDescr[f-1]);
     Serial.println(output);
     #endif
     #endif
@@ -397,8 +422,10 @@ void Marcduino::_runCustomFunction(uint8_t inIdx) {
        _buffer->setStatus(Status::CustomDomePanelRunning, false);
 
     #ifdef BLACBOX_DEBUG
-    if (_buffer->isCustomDomePanelRunning())
-      Serial.println(F("  Panel Command: Running custom routine"));
+    if (_buffer->isCustomDomePanelRunning()) {
+      output = F("  Panel Command: Running custom routine");
+      Serial.println(output);
+    }
     #endif
   }
 
@@ -408,7 +435,7 @@ void Marcduino::_runCustomFunction(uint8_t inIdx) {
 
   f = _myFunction.logicFunction;
   if (f > 0) {
-    logicCmd = _get_pgm_string(table_logicCmd[f-1]);
+    logicCmd = _getPgmString(table_logicCmd[f-1]);
 
     // Execute the logic display command.
     if (_myFunction.panelFunction > 0)
@@ -416,8 +443,13 @@ void Marcduino::_runCustomFunction(uint8_t inIdx) {
     Serial1.print(logicCmd);
 
     #ifdef BLACBOX_DEBUG
-    output = logicCmd; output += "\\r";
+    output = F("  Logic Function: ");
+    output += f;
+    Serial.println(output);
+    output = F("  Logic Command: ");
     Serial.print(output);
+    output = logicCmd;
+    output += "\\r";
     #endif
 
     if (_myFunction.logicFunction == 8) {
@@ -430,15 +462,17 @@ void Marcduino::_runCustomFunction(uint8_t inIdx) {
       Serial1.print(logicCmd);
 
       #ifdef BLACBOX_DEBUG
-      output = logicCmd; output += "\\r";
-      Serial.print(output);
+      output += logicCmd;
+      output += "\\r";
       #endif
     }
-    Serial.println();
 
+    #ifdef BLACBOX_DEBUG
+    Serial.println(output);
+    #endif
     #ifdef BLACBOX_VERBOSE
-    output = "  Logic descr: ";
-    output += table_logicDescr[f];
+    output = "  Logic Descr: ";
+    output += _getPgmString(table_logicDescr[f-1]);
     Serial.println(output);
     #endif
   }
@@ -449,7 +483,9 @@ void Marcduino::_runCustomFunction(uint8_t inIdx) {
 // =====================================
 int8_t Marcduino::_getStandardFunctionIndex() {
 
-  String _functionName = _namespace+F("_getStandardFunctionIndex()");
+  #if defined(BLACBOX_DEBUG) || defined (BLACBOX_VERBOSE)
+  String functionName = _className+F("_getStandardFunctionIndex()");
+  #endif
 
 // This function evaluates which buttons are pressed and returns the index
 // value appropriate for the functionTypes and standardFunctions arrays.
@@ -480,9 +516,8 @@ int8_t Marcduino::_getStandardFunctionIndex() {
 
   #ifdef BLACBOX_VERBOSE
   if (out > -1) {
-    Serial.println(_functionName);
-    output = F("  sfIndex: "); output += out;
-    Serial.println(output);
+    output = F(" - sfIndex: "); output += out;
+    Serial.println(functionName+output);
   }
   #endif
 
@@ -495,7 +530,9 @@ int8_t Marcduino::_getStandardFunctionIndex() {
 // ===================================
 int8_t Marcduino::_getCustomFunctionIndex(uint8_t in) {
 
-  String _functionName = _namespace+F("_getCustomFunctionIndex()");
+  #if defined(BLACBOX_DEBUG) || defined (BLACBOX_VERBOSE)
+  String functionName = _className+F("_getCustomFunctionIndex()");
+  #endif
 
   int8_t out;
   switch (in) {
@@ -508,11 +545,9 @@ int8_t Marcduino::_getCustomFunctionIndex(uint8_t in) {
   };
 
   #ifdef BLACBOX_VERBOSE
-  Serial.println(_functionName);
-  output = F("  Index in: ");  output += in;
-  Serial.println(output);
-  output = F("  Index out: "); output += out;
-  Serial.println(output);
+  output = F(" - Index in: ");  output += in;
+  output += F(", Index out: "); output += out;
+  Serial.println(functionName+output);
   #endif
 
   return out;
@@ -524,7 +559,9 @@ int8_t Marcduino::_getCustomFunctionIndex(uint8_t in) {
 // =================================
 int8_t Marcduino::_getPanelRoutineIndex(uint8_t in) {
 
-  String _functionName = _namespace+F("_getPanelRoutineIndex()");
+  #if defined(BLACBOX_DEBUG) || defined (BLACBOX_VERBOSE)
+  String functionName = _className+F("_getPanelRoutineIndex()");
+  #endif
 
   int8_t out;
   switch (in) {
@@ -534,11 +571,9 @@ int8_t Marcduino::_getPanelRoutineIndex(uint8_t in) {
   };
 
   #ifdef BLACBOX_VERBOSE
-  Serial.println(_functionName);
-  output = F("  Index in: ");  output += in;
-  Serial.println(output);
-  output = F("  Index out: "); output += out;
-  Serial.println(output);
+  output = F(" - Index in: ");   output += in;
+  output += F(" - Index out: "); output += out;
+  Serial.println(functionName+output);
   #endif
 
   return out;
@@ -550,14 +585,14 @@ int8_t Marcduino::_getPanelRoutineIndex(uint8_t in) {
 // ==============================
 void Marcduino::_setMyFunction(uint8_t sfIdx, uint8_t cfIdx) {
 
-  String _functionName = _namespace+F("_setMyFunction()");
+  #if defined(BLACBOX_DEBUG) || defined (BLACBOX_VERBOSE)
+  String functionName = _className+F("_setMyFunction()");
+  #endif
 
   #ifdef BLACBOX_VERBOSE
-  Serial.println(_functionName);
-  output = F("  sfIndex in: "); output += sfIdx;
-  Serial.println(output);
-  output = F("  cfIndex in: "); output += cfIdx;
-  Serial.println(output);
+  output = F(" - sfIndex in: "); output += sfIdx;
+  output += F(", cfIndex in: "); output += cfIdx;
+  Serial.println(functionName+output);
   #endif
 
   // Initialize it first.
@@ -566,7 +601,7 @@ void Marcduino::_setMyFunction(uint8_t sfIdx, uint8_t cfIdx) {
     _myPanels[i] = panelRoutine_NONE[i];
 
   #ifdef BLACBOX_VERBOSE
-  Serial.println(F("  Initialized"));
+  Serial.println(functionName+F(" - Initialized"));
   #endif
 
   // Now go get the custom function settings.
@@ -576,15 +611,13 @@ void Marcduino::_setMyFunction(uint8_t sfIdx, uint8_t cfIdx) {
     for (uint8_t i = 0; i < NUMBER_OF_DOME_PANELS; i++)
       _myPanels[i] = (table_panelRoutines[prIdx])[i];
     #ifdef BLACBOX_VERBOSE
-    Serial.println(_functionName);
-    output = F("  prIndex out: "); output += prIdx;
-    Serial.println(output);
+    output = F(" - prIndex out: "); output += prIdx;
+    Serial.println(functionName+output);
     #endif
   }
 
   #ifdef BLACBOX_VERBOSE
-  output = F("  Function settings set");
-  Serial.println(output);
+  Serial.println(functionName+F(" - Function settings set"));
   #endif
 
 };
@@ -594,7 +627,9 @@ void Marcduino::_setMyFunction(uint8_t sfIdx, uint8_t cfIdx) {
 // ==========================
 uint8_t Marcduino::_setPanelState(uint8_t idx) {
 
-  String _functionName = _namespace+F("_setPanelState()");
+  #if defined(BLACBOX_DEBUG) || defined (BLACBOX_VERBOSE)
+  String functionName = _className+F("_setPanelState()");
+  #endif
 
   uint8_t statusTotal = 0;
   for (uint8_t i = 0; i < NUMBER_OF_DOME_PANELS; i++) {
@@ -614,10 +649,10 @@ uint8_t Marcduino::_setPanelState(uint8_t idx) {
 
   #ifdef BLACBOX_VERBOSE
   if (statusTotal > 0) {
-    Serial.println(_functionName);
+    Serial.println(functionName);
     for (uint8_t i = 0; i < NUMBER_OF_DOME_PANELS; i++) {
-      output = F("  Panel #"); output += i+1;
-      output += F("  Status: "); output += _panelState[i].Status;
+      output = F(" - Panel #"); output += i+1;
+      output += F(" Status: "); output += _panelState[i].Status;
       output += F(" Start: "); output += _panelState[i].Start;
       output += F(" Delay: "); output += _panelState[i].Start_Delay;
       output += F(" Open: "); output += _panelState[i].Open_Time;
@@ -630,11 +665,13 @@ uint8_t Marcduino::_setPanelState(uint8_t idx) {
 }
 
 // ===========================
-//      _get_pgm_string()
+//      _getPgmString()
 // ===========================
-String Marcduino::_get_pgm_string(const char *tableValue) {
+String Marcduino::_getPgmString(const char *tableValue) {
 
-  String _functionName = _namespace+F("_get_pgm_string");
+  #if defined(BLACBOX_DEBUG) || defined (BLACBOX_VERBOSE)
+  String functionName = _className+F("_getPgmString()");
+  #endif
 
   // This function takes in an array element (row) that has been
   // stored in program memory and returns its string content.
