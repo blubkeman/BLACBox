@@ -1,6 +1,6 @@
 /*
  * Buffer.h - Library for controller inputs for the B.L.A.C.Box system
- * Created by Brian Lubkeman, 18 April 2020
+ * Created by Brian Lubkeman, 21 May 2020
  * Inspired by S.H.A.D.O.W. controller code written by KnightShade
  * Released into the public domain.
  */
@@ -13,7 +13,7 @@
 
 /* From the USB Host Shield library, 
  * controllerEnums.h defines ButtonEnum enumeration.              |   These are my uses
- *      PS3       PS4       Wii       Wii U Pro  Xbox      |  PS3 Nav1  PS3 Nav2
+ *      PS3       PS4       Wii       Wii U Pro  Xbox ONE  |  PS3 Nav1  PS3 Nav2
  *      --------  --------  --------  ---------  --------  |  --------  --------
  * 0  = UP        UP        UP        UP         UP        |  UP
  * 1  = RIGHT     RIGHT     RIGHT     RIGHT      RIGHT     |  DOWN
@@ -61,8 +61,8 @@ enum Status {
 };
 
 const uint8_t NUMBER_OF_STATUSES = 9;
-extern String output;
 
+extern String output;
 
 /* ===========================================
  *           Buffer Class Definition
@@ -76,6 +76,10 @@ class Buffer {
     bool _status[NUMBER_OF_STATUSES];
     uint8_t _controllerCycle;
 
+    #if defined(BLACBOX_DEBUG) || defined (BLACBOX_VERBOSE)
+    String _className;
+    #endif
+
     #ifdef TEST_CONTROLLER
     void _displayStick(String stick);
     void _displayButton(String dPadButton);
@@ -87,12 +91,22 @@ class Buffer {
     // =====================
     Buffer() {
       _controllerCycle = 0;
+
+      #if defined(BLACBOX_DEBUG) || defined (BLACBOX_VERBOSE)
+      _className = F("Buffer::");
+      #endif
+
     };
 
     // =================
     //      begin()
     // =================
     void begin() {
+
+      #if defined(BLACBOX_DEBUG) || defined (BLACBOX_VERBOSE)
+      String functionName = _className+F("begin()");
+      #endif
+
       // Initialize the array of buttons.
       for (uint8_t i = 0; i < 20; i++)
         this->setButton(i, 0);
@@ -103,9 +117,32 @@ class Buffer {
         this->setPrevStick(i, 127);
       }
 
-      #ifdef TEST_CONTROLLER
-      inputRecvd = false;
+      // Initialize the statuses.
+      setStatus(Status::PrimaryControllerConnected, false);
+      setStatus(Status::SecondaryControllerConnected, false);
+      // The following statuses are normally set in the respective constructors.
+      // We only initialize these if they have not been activated in case other
+      // classes need to know about them.
+      #ifndef DRIVE
+      setStatus(Status::FootMotorEnabled, false);
+      setStatus(Status::FootMotorStopped, true);
       #endif
+      #ifndef DOME
+      setStatus(Status::DomeMotorEnabled, false);
+      setStatus(Status::DomeMotorStopped, true);
+      setStatus(Status::DomeAutomationRunning, false);
+      setStatus(Status::CustomDomePanelRunning, false);
+      #endif
+      #ifndef HOLOPROJECTORS
+      setStatus(Status::HoloAutomationRunning, false);
+      #endif
+
+      #ifdef BLACBOX_DEBUG
+      output = functionName;
+      output += F(" - Control buffer started.");
+      Serial.println(output);
+      #endif
+
     };
 
   // ==============================================
@@ -126,8 +163,14 @@ class Buffer {
     };
     void restoreStick(uint8_t i) { _input.hat[i] = _input.prevHat[i]; };
 
-    bool stickOffCenter(uint8_t i) {
+    bool isStickOffCenter(uint8_t i) {
       return (getStick(i) < 117 || getStick(i) > 137);
+    };
+
+    bool isButtonModified() {
+      return (getButton(L1) && getButton(L2) && \
+              getButton(R1) && getButton(R2) && \
+              getButton(PS) && getButton(PS2));
     };
 
   /* ============================================
@@ -138,6 +181,11 @@ class Buffer {
     //      crazyIvan()
     // =====================
     void crazyIvan(uint8_t xHat, uint8_t yHat) {
+
+      #if defined(BLACBOX_DEBUG) || defined (BLACBOX_VERBOSE)
+      String functionName = _className+F("crazyIvan()");
+      #endif
+
     /* -----------------------------------------------------------------------------------
      * My PS3 Move Navigaton occasionally sends stick X,Y values 0,0 for no known reason.
      * I am calling this a "crazy Ivan" because why not?  I don't want this to be
@@ -175,15 +223,14 @@ class Buffer {
     bool isDomeAutomationRunning()  { return _status[Status::DomeAutomationRunning]; };
     bool isHoloAutomationRunning()  { return _status[Status::HoloAutomationRunning]; };
     bool isCustomDomePanelRunning() { return _status[Status::CustomDomePanelRunning]; };
-    void advanceCycle()             { _controllerCycle = (_controllerCycle < 2 ? _controllerCycle++ : 0); }
-    uint8_t getCycle()              { return _controllerCycle; }
+    void advanceCycle()             { _controllerCycle = (_controllerCycle < 2 ? _controllerCycle++ : 0); };
+    uint8_t getCycle()              { return _controllerCycle; };
 
 
   /* ====================================
    *          Testing functions
    * ==================================== */
     #ifdef TEST_CONTROLLER
-    bool inputRecvd;
     void testInput();
     void scrollInput();
     #endif
@@ -192,7 +239,11 @@ class Buffer {
 
 #ifdef TEST_CONTROLLER
 void Buffer::_displayStick(String stick) {
-  inputRecvd = true;
+
+  #if defined(BLACBOX_DEBUG) || defined (BLACBOX_VERBOSE)
+  String functionName = _className+F("_displayStick()");
+  #endif
+
   output = F("Buffer::testInput - ");
   if (stick == "Left") {
     output += "LeftHatX: ";
@@ -209,7 +260,11 @@ void Buffer::_displayStick(String stick) {
 };
 
 void Buffer::_displayButton(String dPadButton) {
-  inputRecvd = true;
+
+  #if defined(BLACBOX_DEBUG) || defined (BLACBOX_VERBOSE)
+  String functionName = _className+F("_displayButton");
+  #endif
+
   output = F("Buffer::testInput - ");
   if (getButton(L1))          output += "L1 + ";
   else if (getButton(L2))     output += "L2 + ";
@@ -222,6 +277,11 @@ void Buffer::_displayButton(String dPadButton) {
 };
 
 void Buffer::testInput() {
+
+  #if defined(BLACBOX_DEBUG) || defined (BLACBOX_VERBOSE)
+  String functionName = _className+F("testInput()");
+  #endif
+
   if (getStick(LeftHatX) < 117 || getStick(LeftHatX) > 137 || \
       getStick(LeftHatY) < 117 || getStick(LeftHatY) > 137) {
     _displayStick("Left");
@@ -246,12 +306,14 @@ void Buffer::testInput() {
 };
 
 void Buffer::scrollInput() {
+
+  #if defined(BLACBOX_DEBUG) || defined (BLACBOX_VERBOSE)
+  String functionName = _className+F("scrollInput()");
+  #endif
+
 //Nav1 - Up:x Rt:x Dn:x Lt:x L3:x L2:x L1:x PS:x | Nav2 - Up:x Rt:x Dn:x Lt:x R3:x PS:x
-  output = F("Buffer::scrollInput - ");
-  output += "LX:";   output += LeftHatX;
+  output = "LX:";   output += getStick(LeftHatX);
   output += " LY:";  output += getStick(LeftHatY);
-  output += " RX:";  output += getStick(RightHatX);
-  output += " RY:";  output += getStick(RightHatY);
   output += " Up:";  output += getButton(UP);
   output += " Rt:";  output += getButton(RIGHT);
   output += " Dn:";  output += getButton(DOWN);
@@ -259,20 +321,25 @@ void Buffer::scrollInput() {
   output += " X:";   output += getButton(SELECT);
   output += " O:";   output += getButton(START);
   output += " L3:";  output += getButton(L3);
-  output += " R3:";  output += getButton(R3);
   output += " L2:";  output += getButton(L2);
-  output += " R2:";  output += getButton(R2);
   output += " L1:";  output += getButton(L1);
-  output += " R1:";  output += getButton(R1);
   output += " PS:";  output += getButton(PS);
-  output += " 2Up:"; output += getButton(TRIANGLE);
-  output += " 2Rt:"; output += getButton(CIRCLE);
-  output += " 2Dn:"; output += getButton(CROSS);
-  output += " 2Lt:"; output += getButton(SQUARE);
-  #ifdef PS3_NAVIGATION
-  output += " 2PS:"; output += getButton(PS2);
+
+  if ( isSecondaryConnected() ) {
+    output += " RX:";  output += getStick(RightHatX);
+    output += " RY:";  output += getStick(RightHatY);
+    output += " 2Up:"; output += getButton(TRIANGLE);
+    output += " 2Rt:"; output += getButton(CIRCLE);
+    output += " 2Dn:"; output += getButton(CROSS);
+    output += " 2Lt:"; output += getButton(SQUARE);
+    output += " R3:";  output += getButton(R3);
+    output += " R2:";  output += getButton(R2);
+    output += " R1:";  output += getButton(R1);
+    output += " 2PS:"; output += getButton(PS2);
+  }
+
   Serial.println(output);
-  #endif
+
 };
 #endif
 
