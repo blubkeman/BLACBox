@@ -1,6 +1,6 @@
 /*
  * Settings_MD_Functions.h - Marcduino function configuration for the B.L.A.C.Box system
- * Created by Brian Lubkeman, 18 April 2020
+ * Created by Brian Lubkeman, 21 May 2020
  * Inspired by S.H.A.D.O.W. controller code written by KnightShade
  * Released into the public domain.
 */
@@ -25,25 +25,25 @@
    *    FOOT CONTROLLER
    *    ===============
    *    Up           = Std function 12 (Full Awake mode reset (panel close, rnd sound, holo move,holo lights off))
-   *    Left         = Std function 13 (Mid Awake mode reset (panel close, rnd sound, stop holos))
    *    Right        = Std function 14 (Full Awake+ reset (panel close, rnd sound, holo move, holo lights on))
    *    Down         = Std function 11 (Quite mode reset (panel close, stop holos, stop sounds))
+   *    Left         = Std function 13 (Mid Awake mode reset (panel close, rnd sound, stop holos))
    *    Cross+Up     = Std function 26 (Volume Up)
-   *    Cross+Left   = Std function 23 (Holo Lights On (All))
    *    Cross+Right  = Std function 24 (Holo Lights Off (All))
    *    Cross+Down   = Std function 27 (Volume Down)
+   *    Cross+Left   = Std function 23 (Holo Lights On (All))
    *    Circle+Up    = Std function 2  (Scream - all panels open)
-   *    Circle+Left  = Std function 4  (Fast (smirk) back and forth wave)
    *    Circle+Right = Std function 7  (Faint / Short Circuit)
    *    Circle+Down  = Std function 10 (Disco)
+   *    Circle+Left  = Std function 4  (Fast (smirk) back and forth wave)
    *    PS+Up        = Custom function; play track 183, logic display "Star Wars", no panels
-   *    PS+Left      = Custom function; play track 186, logic display random, no panels 
    *    PS+Right     = Custom function; play track 185, logic display random, no panels
    *    PS+Down      = Custom function; play track 184, logic display random, no panels
+   *    PS+Left      = Custom function; play track 186, logic display random, no panels 
    *    L1+Up        = Std function 8  (Cantina Dance - orchestral, rhythmic panel dance)
-   *    L1+Left      = Std function 3  (Wave, One Panel at a time)
    *    L1+Right     = Std function 5  (Wave 2, Open progressively all panels, then close one by one)
    *    L1+Down      = Std function 9  (Leia message)
+   *    L1+Left      = Std function 3  (Wave, One Panel at a time)
    *    
    *    DOME CONTROLLER
    *    ===============
@@ -52,21 +52,21 @@
    *    Down         = Std function 59 (Close Body Panel #2)
    *    Left         = Std function 56 (Open Body Panel #1)
    *    Cross+Up     = Std function 28 (Volume Max)
-   *    Cross+Left   = Std function 33 (Close All Dome Panels)
    *    Cross+Right  = Std function 30 (Open All Dome Panels)
    *    Cross+Down   = Std function 29 (Volume Mid)
+   *    Cross+Left   = Std function 33 (Close All Dome Panels)
    *    Circle+Up    = Std function 22 (Random Holo Movement On (All) - No other actions)
-   *    Circle+Left  = Std function 23 (Holo Lights On (All))
    *    Circle+Right = Std function 24 (Holo Lights Off (All))
    *    Circle+Down  = Std function 25 (Holo reset (motion off, lights off))
+   *    Circle+Left  = Std function 23 (Holo Lights On (All))
    *    PS+Up        = Std function 38 (Open Dome Panel #3)
-   *    PS+Left      = Std function 40 (Open Dome Panel #4)
    *    PS+Right     = Std function 41 (Close Dome Panel #4)
    *    PS+Down      = Std function 39 (Close Dome Panel #3)
+   *    PS+Left      = Std function 40 (Open Dome Panel #4)
    *    L1+Up        = Std function 34 (Open Dome Panel #1)
-   *    L1+Left      = Std function 36 (Open Dome Panel #2)
    *    L1+Right     = Std function 37 (Close Dome Panel #2)
    *    L1+Down      = Std function 35 (Close Dome Panel #1)
+   *    L1+Left      = Std function 36 (Open Dome Panel #2)
    * =============================================== */
 
 // -------------------------
@@ -206,7 +206,7 @@ const CustomFunctions_Struct customFunctions[] = {
 // For that, we define a data structure with the following data elements.
 // The first element (Use) indicates if the panel is used in the routine.
 // The second element (Start_Delay) indicates in seconds how much time must
-//  pass after the routine starts before this panel is opened.
+//  pass after the routine starts and before this panel is opened.
 // The third element (Open_Time) indicates in seconds how long the panel stays
 //  open. After that time passes, the panel will close.
 
@@ -217,20 +217,22 @@ struct PanelSettings_Struct {
 };
 
 // We need at least one defined array to get the code to compile.
+// This one array sets all panels to not be used. It effectively does nothing.
 PanelSettings_Struct panelRoutine_NONE[NUMBER_OF_DOME_PANELS]= {
-  {false, 1, 5}
- ,{false, 1, 5}
- ,{false, 1, 5}
- ,{false, 1, 5}
- ,{false, 1, 5}
- ,{false, 1, 5}
- ,{false, 1, 5}
- ,{false, 1, 5}
- ,{false, 1, 5}
- ,{false, 1, 5}
+  {false, 0, 0}
+ ,{false, 0, 0}
+ ,{false, 0, 0}
+ ,{false, 0, 0}
+ ,{false, 0, 0}
+ ,{false, 0, 0}
+ ,{false, 0, 0}
+ ,{false, 0, 0}
+ ,{false, 0, 0}
+ ,{false, 0, 0}
 };
 
-/*
+/* // This example opens dome panels 1-6 after 1 second
+ // then closes them all after 5 seconds.
 const PanelSettings_Struct panelRoutine_PSUP[NUMBER_OF_DOME_PANELS] = {
   {true, 1, 5},  // dome panel #1
   {true, 1, 5},  // dome panel #2
@@ -502,14 +504,14 @@ const char *const table_bodyCmd[] = {
 //  array of commands, but panels and logic display do.  We'll build those here.
 //  Once more, these constants are saved in program memory.
 
-const char logic_01[] PROGMEM = "@0T1\r";   const char ldDescr_01[] PROGMEM = "Display normal random sequence";
-const char logic_02[] PROGMEM = "@0T4\r";   const char ldDescr_02[] PROGMEM = "Short circuit (10 second display sequence)";
-const char logic_03[] PROGMEM = "@0T5\r";   const char ldDescr_03[] PROGMEM = "Scream (flashing light display sequence)";
-const char logic_04[] PROGMEM = "@0T6\r";   const char ldDescr_04[] PROGMEM = "Leia (34 second light sequence)";
-const char logic_05[] PROGMEM = "@0T10\r";  const char ldDescr_05[] PROGMEM = "Display “Star Wars”";
-const char logic_06[] PROGMEM = "@0T11\r";  const char ldDescr_06[] PROGMEM = "March light sequence";
-const char logic_07[] PROGMEM = "@0T92\r";  const char ldDescr_07[] PROGMEM = "Spectrum, bar graph display sequence";
-const char logic_08[] PROGMEM = "@0T100\r"; const char ldDescr_08[] PROGMEM = "Dispaly custom text";
+const char logic_01[] PROGMEM = "@0T1\r";
+const char logic_02[] PROGMEM = "@0T4\r";
+const char logic_03[] PROGMEM = "@0T5\r";
+const char logic_04[] PROGMEM = "@0T6\r";
+const char logic_05[] PROGMEM = "@0T10\r";
+const char logic_06[] PROGMEM = "@0T11\r";
+const char logic_07[] PROGMEM = "@0T92\r";
+const char logic_08[] PROGMEM = "@0T100\r";
 
 // Set up a table (array) to reference the logic functions.
 
@@ -519,11 +521,20 @@ const char *const table_logicCmd[] = {
 };
 
 #ifdef BLACBOX_VERBOSE
+const char ldDescr_01[] PROGMEM = "Display normal random sequence";
+const char ldDescr_02[] PROGMEM = "Short circuit (10 second display sequence)";
+const char ldDescr_03[] PROGMEM = "Scream (flashing light display sequence)";
+const char ldDescr_04[] PROGMEM = "Leia (34 second light sequence)";
+const char ldDescr_05[] PROGMEM = "Display “Star Wars”";
+const char ldDescr_06[] PROGMEM = "March light sequence";
+const char ldDescr_07[] PROGMEM = "Spectrum, bar graph display sequence";
+const char ldDescr_08[] PROGMEM = "Dispaly custom text";
+
 // Set up a table (array) to reference the logic function descriptions.
 
 const char *const table_logicDescr[] = {
-  ldDescr_02, ldDescr_03, ldDescr_04, ldDescr_05,
-  ldDescr_06, ldDescr_07, ldDescr_08
+  ldDescr_01, ldDescr_02, ldDescr_03, ldDescr_04,
+  ldDescr_05, ldDescr_06, ldDescr_07, ldDescr_08
 };
 #endif
 
