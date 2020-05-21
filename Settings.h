@@ -1,6 +1,6 @@
 /*
  * Settings.h - User settings for the B.L.A.C.Box system
- * Created by Brian Lubkeman, 18 April 2020
+ * Created by Brian Lubkeman, 21 May 2020
  * Inspired by S.H.A.D.O.W. controller code written by KnightShade
  * Released into the public domain.
 */
@@ -54,9 +54,9 @@
 /* ==================================================
  *                 Enable/Disable modes
  * ================================================== */
-#define TEST_CONTROLLER   // Uncomment to enable test mode for the controller.  Comment out to disable.
+//#define TEST_CONTROLLER   // Uncomment to enable test mode for the controller.  Comment out to disable.
 #define BLACBOX_DEBUG     // Uncomment to enable debug mode.  Comment out to disable.
-//#define BLACBOX_VERBOSE   // Uncomment to enable more verbose debugging.  Comment out to disable.
+#define BLACBOX_VERBOSE   // Uncomment to enable more verbose debugging.  Comment out to disable.
 
 
 /* =============================================
@@ -81,6 +81,27 @@ const String PRIMARY_CONTROLLER_MAC = "00:06:F7:B8:57:01";
 // monitor, and record its value here.
 
 const String BACKUP_CONTROLLER_MAC = "xx:xx:xx:xx:xx:xx";
+
+
+/* ==================================================
+ *                  Active Peripherals
+ * ================================================== */
+// This is largely used for enabling/disabling broad functions during code development.
+// Once in production, these definitions will likely be removed.
+
+// Uncomment the elements you have running in your astromech.
+
+//#define DRIVE             // Uncomment this when you have connected the foot motors and controller(s).
+#define DOME              // Uncomment this when you have connected the dome motor.
+#define MARCDUINO         // Uncomment this when you have at least one Marcduino master.
+//#define MD_BODY_MASTER    // Uncomment this if you are using the optional Marcduino body master.
+//#define MD_BODY_SOUND     // Uncomment this if sound is sent to the body master.
+//#define HOLOPROJECTORS    // Uncomment this if you are using at least 1 holoprojector. Max 3 holos.
+//#define LOGIC_DISPLAYS    // Uncomment this if you are using Teeces logic display.
+//#define DOME_PANELS       // Uncomment this if you are using at least 1 dome panel. Max 10 panels.
+//#define BODY_PANELS       // Uncomment this if you are using at least 1 body panel. Max 10 panels.
+//#define MAGIC_PANEL       // Uncomment this if you are using a magic panel in the dome.
+const int MARCDUINO_BAUD_RATE = 9600; // Do not change this!
 
 
 /* ======================================================
@@ -110,8 +131,10 @@ const int SERIAL_LATENCY = 25;  //This is a delay factor in ms to prevent queuei
  * ========================================================= */
 // Set the following variable according to which system you use for your foot motor controller.
 
-const int FOOT_CONTROLLER = 0;    // 0 = Sabertooth Serial
-                                  // 1 = individual R/C output (for Q85/NEO motors with 1 controller for each foot, or Sabertooth Mode 2 Independant Mixing)
+const int FOOT_CONTROLLER = 1;    // 0 = Sabertooth Serial
+                                  // 1 = R/C output; BHD mixing code included; Roboteq 1360 uses this
+                                  // 2 = R/C output; BHD mixing code removed; Roboteq 2360 uses this
+                                  
 
 // The following settings are fairly advanced.  Tinker with them after you've
 // studied the code to learn their use, or have talked with members for support.
@@ -148,27 +171,6 @@ const int RIGHT_FOOT_PIN  = 45;  // connect this pin to motor controller for rig
 //    const int STEERING_FACTOR = 100; // The larger SteeringFactor is the less senstitive steering is...
 //                                     // Smaller values give more accuracy in making fine steering corrections
 //                                     // XDist*sqrt(XDist+SteeringFactor)
-
-
-/* ==================================================
- *                  Active Peripherals
- * ================================================== */
-// This is largely used for enabling/disabling broad functions during code development.
-// Once in production, these definitions will likely be removed.
-
-// Uncomment the elements you have running in your astromech.
-
-//#define DRIVE             // Uncomment this when you have connected the foot motors and controller(s).
-//#define DOME              // Uncomment this when you have connected the dome motor.
-#define MARCDUINO         // Uncomment this when you have at least one Marcduino master.
-//#define HOLOPROJECTORS    // Uncomment this if you are using at least 1 holoprojector. Max 3 holos.
-//#define LOGIC_DISPLAYS    // Uncomment this if you are using Teeces logic display.
-//#define DOME_PANELS       // Uncomment this if you are using at least 1 dome panel. Max 10 panels.
-#define BODY_PANELS       // Uncomment this if you are using at least 1 body panel. Max 10 panels.
-//#define MAGIC_PANEL       // Uncomment this if you are using a magic panel in the dome.
-#define MD_BODY_MASTER    // Uncomment this if you are using the optional Marcduino body master.
-#define MD_BODY_SOUND     // Uncomment this if sound is sent to the body master.
-const int MARCDUINO_BAUD_RATE = 9600; // Do not change this!
 
 
 /* =================================================
