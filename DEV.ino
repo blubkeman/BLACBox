@@ -1,7 +1,7 @@
 /* =================================================================================
  *    B.L.A.C.Box: Brian Lubkeman's Astromech Controller
  * =================================================================================
- *                          Last Revised Date: 21 May 2020
+ *                          Last Revised Date: 22 October 2020
  *                          Revised By: Brian E. Lubkeman
  *  Inspired by the PADAWAN (danf), SHADOW (KnightShade), SHADOW_MD (vint43) effort
  * =================================================================================
@@ -26,15 +26,15 @@
  * This is a heavily modified version of the S.H.A.D.O.W. controller system. 
  * It is an ambitious rewrite with the following goals.
  * 
- *   1. Achieved - Improve the success rate of connecting my PS3 Move Navigation controllers.
- *   2. Achieved - Decouple controller code from peripheral code through the use of an intermediary buffer.
- *   3. Achieved - Encapsulate code into libraries.
- *   4. In progress - Support the Marcduino system.
- *   5. In progress - Support sound sent to the optional Marcduino body master.
- *   6. In progress - Support dome motor control using a Syren 10.
- *   7. In progress - Support foot motor control using R/C without mixing (Roboteq 2360).
- *   8. Future - Support foot motor control using Sabertooth.
- *   9. Future - Support foot motor control using R/C with mixing (Roboteq SBL1360).
+ *   1.  Achieved - Improve the success rate of connecting my PS3 Move Navigation controllers.
+ *   2.  Achieved - Decouple controller code from peripheral code through the use of an intermediary buffer.
+ *   3.  Achieved - Encapsulate code into libraries.
+ *   4.  Achieved - Support the Marcduino system.
+ *   5.  Achieved - Support sound sent to the optional Marcduino body master.
+ *   6.  In progress - Support dome motor control using a Syren 10.
+ *   7.  In progress - Support foot motor control using R/C without mixing (Roboteq 2360).
+ *   8.  Future - Support foot motor control using R/C with mixing (Roboteq SBL1360).
+ *   9.  Future - Support foot motor control using Sabertooth.
  *   10. Future - Support I2C-based peripherals.
  *   11. Future - Support additional controllers available through the USB Host Shield code.
  *
@@ -76,43 +76,50 @@ Buffer controlBuffer;
 // ------------------------
 #ifdef PS3_NAVIGATION
 #include "Controller_PS3Nav.h"
-BLACBox_PS3Nav controller(&controlBuffer);
+Controller_PS3Nav controller(&controlBuffer);
 // This pointer helps us with the attachOnInit functions.
-BLACBox_PS3Nav* BLACBox_PS3Nav::thisController = { NULL };
+Controller_PS3Nav * Controller_PS3Nav::anchor = { NULL };
 #endif
 
 // ------------------------
-// This is our dome motor.  It supports the Syren 10 motor controller.
+// These are our Serial pins.
+// ------------------------
+#ifdef DOME or DRIVE
+// Currently, the code assumes use of either a Syren 10 or a Sabertooth controller.
+HardwareSerial &MotorSerial = Serial2;
+#endif
+#ifdef MARCDUINO
+HardwareSerial &DomeSerial = Serial1;
+#ifdef MD_BODY_MASTER
+HardwareSerial &BodySerial = Serial3;
+#endif
+#endif
+
+// ------------------------
+// This is our dome motor.  It currently supports the Syren 10 motor controller.
 // ------------------------
 #ifdef DOME
-  #include "Peripheral_Dome_Motor.h"
-  Dome_Motor domeMotor(&controlBuffer);
+#include "Peripheral_Dome_Motor.h"
+Dome_Motor domeMotor(&controlBuffer);
+Dome_Motor * Dome_Motor::anchor = { NULL };
 #endif
 
 // ------------------------
-// This is our foot motor controller.  It supports the Roboteq SBL2360.
-// Code exists for the Sabertooth and Roboteq SBL1360 or other R/C controller
-// that requires BHD mixing, but these have not been tested.
+// This is our foot motor controller.  It supports the Roboteq SBL2360
+// or other R/C controller that mixes by itself.
+// Code for the Sabertooth and Roboteq SBL1360 or other R/C controller
+// that requires remixing are planned for future support.
 // ------------------------
 #ifdef DRIVE
-  #include "Peripheral_Foot_Motors.h"
-  #if FOOT_CONTROLLER == 2
-    // This supports the Roboteq SBL2360 motor controllers.
-    Roboteq_FootMotor footMotors(&controlBuffer);
-  #elif FOOT_CONTROLLER == 1
-    // This supports the Roboteq SBL1360 or other R/C motor controllers.
-    RC_FootMotor footMotors(&controlBuffer);
-  #elif FOOT_CONTROLLER == 0
-    // This supports the Sabertooth motor controller.
-    // Commands are passed through the Syren to the Sabertooth.
-    Sabertooth_FootMotor footMotors(&controlBuffer);
-  #endif
+#include "Peripheral_RC_FootMotor.h"
+RC_FootMotor footMotors(&controlBuffer);
+RC_FootMotor * RC_FootMotor::anchor = { NULL };
 #endif
 
 // ------------------------
 // This is our sound, logic display, holoprojectors, dome panels, and body panels.
-//   The Marcduino system is supported.  I hope to support a future alternative
-//   that uses I2C.
+// The Marcduino system is supported.  I hope to support a future alternative
+// that uses I2C.
 //   This is very much a work in progress.
 // ------------------------
 #ifdef MARCDUINO
@@ -121,11 +128,16 @@ Marcduino marcduino(&controlBuffer);
 #endif
 
 
+/* ================================================
+ *           Declarations and definitions
+ * ================================================ */
+String output;
+
+
 /* ================================
  *           Main Program
  * ================================ */
 void setup() {
-
   // Start the serial monitor.
 
   Serial.begin(115200);
@@ -138,44 +150,51 @@ void setup() {
   controlBuffer.begin();
   controller.begin();
 
-  // Serial2 is for the Syren 10 and Sabertooth motor controllers.
-
   #ifdef DOME or DRIVE
-    Serial2.begin(MOTOR_BAUD_RATE);
-    while (!Serial2);
+    MotorSerial.begin(MOTOR_BAUD_RATE); // This is for the Syren 10 and/or Sabertooth
+    while (!MotorSerial);
     #ifdef DOME
       domeMotor.begin();
+      // Setup an interrupt for stopping the dome motor.
+      pinMode(domeInterruptPin, INPUT_PULLUP);
+      digitalWrite(domeInterruptPin, HIGH);
+      attachInterrupt(digitalPinToInterrupt(domeInterruptPin), domeMotor.domeISR, LOW);
     #endif
     #ifdef DRIVE
       footMotors.begin();
+      // Setup an interrupt for stopping the foot motors.
+      pinMode(footInterruptPin, INPUT_PULLUP);
+      digitalWrite(footInterruptPin, HIGH);
+      attachInterrupt(digitalPinToInterrupt(footInterruptPin), footMotors.footISR, LOW);
     #endif
   #endif
 
   // Start serial communications with the Marcduino dome master and optional body master.
 
   #ifdef MARCDUINO
-  Serial1.begin(MARCDUINO_BAUD_RATE);
+  DomeSerial.begin(MARCDUINO_BAUD_RATE);
   #ifdef MD_BODY_MASTER
-  Serial3.begin(MARCDUINO_BAUD_RATE);
+  BodySerial.begin(MARCDUINO_BAUD_RATE);
   #endif
   marcduino.begin();
   #endif
 
-  #if defined(BLACBOX_DEBUG) || defined(BLACBOX_VERBOSE)
-  output.reserve(200); // Reserve 200 bytes for the output string
-  #endif
+  // Reserve 200 bytes for the output string
 
+  output.reserve(200);
 }
 
 void loop() {
-
   /* ========================
    *      DRIVE/STEERING
    * ======================== */
   #ifdef DRIVE
   if ( (controller.read()) ) {
-    // This is skipped when we have a fault condition.
     footMotors.interpretController();
+  } else {
+    // Bad read. Stop the motor.
+    if ( ! controlBuffer.isFootStopped() )
+      controlBuffer.stopFootMotor();
   }
   #endif
 
@@ -184,10 +203,13 @@ void loop() {
    * ======================= */
   #ifdef DOME
   if ( (controller.read()) ) {
-    // This is skipped when we have a fault condition.
     domeMotor.interpretController();
     if (controlBuffer.isDomeAutomationRunning())
       domeMotor.automation();
+  } else {
+    // Bad read. Stop the motor.
+    if ( ! controlBuffer.isDomeStopped() )
+      controlBuffer.stopDomeMotor();
   }
   #endif
 
@@ -196,11 +218,9 @@ void loop() {
    * =========================== */
   #ifdef MARCDUINO
   if ( (controller.read()) ) {
-    // This is skipped when we have a fault condition.
     marcduino.interpretController();
-    if (controlBuffer.isCustomDomePanelRunning())
+    if (controlBuffer.isDomeCustomPanelRunning())
       marcduino.runCustomPanelSequence();
   }
   #endif
-
 }
