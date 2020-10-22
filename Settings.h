@@ -1,62 +1,29 @@
-/*
- * Settings.h - User settings for the B.L.A.C.Box system
- * Created by Brian Lubkeman, 21 May 2020
+/* =================================================================================
+ *    B.L.A.C.Box: Brian Lubkeman's Astromech Controller
+ * =================================================================================
+ * Settings.h - Library for user settings
+ * Created by Brian Lubkeman, 22 October 2020
  * Inspired by S.H.A.D.O.W. controller code written by KnightShade
  * Released into the public domain.
-*/
+ */
 #ifndef _SETTINGS_H_
 #define _SETTINGS_H_
 
-/* Consolidated Arduino pin assignments
- * ============================================
- * *** When using Marcduino
- *    Pin 14 = Serial3 Tx to optional Marduino body master
- *    Pin 18 = Serial1 Tx to Marduino dome master/slave
- *
- * *** When NOT using Marcduino
- *    Pin 14 = Serial3 Tx to serial Teeces
- *    Pin 15 = Serial3 Rx from serial Teeces
- *    Pin 18 = Serial1 Tx to serial sound board
- *    Pin 19 = Serial1 Rx from serial sound board
- *    Pin 49 = Top utility arm servo
- *    Pin 50 = Bottom utility arm servo
- *
- * *** When using Syren10 dome motor and/or Sabertooth foot motor controller
- *    Pin 16 = Serial2 Tx to Syren 10/Sabertooth
- *    Pin 17 = Serial2 Rx from Syren 10/Sabertooth
- *
- * *** When using R/C foot motor controller instead of Sabertooth
- *    Pin 44 = Left foot motor
- *    Pin 45 = Right foot motor
- *
- * *** Coin slot LEDs are an independent system
- *    
- * Pin assignments on an Adafruit 16-channel servo board
- * =====================================================
- * *** When using holoprojectors with I2C and Adafruit servo board
- *    Pin 0  = Front holoprojector red
- *    Pin 1  = Front holoprojector green
- *    Pin 2  = Front holoprojector blue
- *    Pin 3  = Front holoprojector X axis
- *    Pin 4  = Front holoprojector Y axis
- *    Pin 5  = Back holoprojector red
- *    Pin 6  = Back holoprojector green
- *    Pin 7  = Back holoprojector blue
- *    Pin 8  = Back holoprojector X axis
- *    Pin 9  = Back holoprojector Y axis
- *    Pin 10 = Top holoprojector red
- *    Pin 11 = Top holoprojector green
- *    Pin 12 = Top holoprojector blue
- *    Pin 13 = Top holoprojector X axis
- *    Pin 14 = Top holoprojector Y axis  
- */
+#include <Arduino.h>
+
 
 /* ==================================================
  *                 Enable/Disable modes
  * ================================================== */
-//#define TEST_CONTROLLER   // Uncomment to enable test mode for the controller.  Comment out to disable.
-#define BLACBOX_DEBUG     // Uncomment to enable debug mode.  Comment out to disable.
-#define BLACBOX_VERBOSE   // Uncomment to enable more verbose debugging.  Comment out to disable.
+#define DEBUG_ALL         // For debugging everything. Uncomment to enable debug mode. Comment out to disable.
+#define TEST_CONTROLLER   // Uncomment to enable test mode for the controller. Comment out to disable.
+//#define DEBUG_BUFFER      // For debugging the buffer. Uncomment to enable debug mode. Comment out to disable.
+//#define DEBUG_CONTROLLER  // For debugging the controller. Uncomment to enable debug mode. Comment out to disable.
+//#define DEBUG_MARCDUINO   // For debugging the Marcduino. Uncomment to enable debug mode. Comment out to disable.
+//#define DEBUG_DOME        // For debugging the dome motor. Uncomment to enable debug mode. Comment out to disable.
+//#define DEBUG_FOOT        // For debugging the foot motors. Uncomment to enable debug mode. Comment out to disable.
+
+//#define DEBUG_CRAZYIVAN   // For debugging the crazyIvan event (not included in DEBUG_ALL). Uncomment to enable debug mode. Comment out to disable.
 
 
 /* =============================================
@@ -69,18 +36,50 @@
 // #define PS3_CONTROLLER     // TODO: Future implementation.  Using one PS3 controller.
 // #define PS4_CONTROLLER     // TODO: Future implementation.  Using one PS4 controller.
 
-// Step through the process to pair your controller to the Bluetooth dongle.
-// (See directions in the wiki found at astromech.net.) When pairing your
-// primary controller, note the MAC address displayed in the serial monitor.
-// Set that address in the following variable.
+// Step through the process to pair your controller(s) to the Bluetooth dongle.
+// (See directions in the wiki found at astromech.net.) Note the MAC address
+// of each controller. Edit the Controller_PS3Nav.cpp tab listing each MAC
+// address in the array of authorized addresses.
 
-const String PRIMARY_CONTROLLER_MAC = "00:06:F7:B8:57:01";
+// If you have a relay module controlling your foot motor controller
+// then uncomment this line to enable the deadman code.
 
-// If you have a backup primary controller, step through the process to pair
-// it to the Bluetooth dongle.  Note the MAC address display in the serial
-// monitor, and record its value here.
+#define DEADMAN
+const uint8_t DEADMAN_PIN = 46;
 
-const String BACKUP_CONTROLLER_MAC = "xx:xx:xx:xx:xx:xx";
+// Getting the joystick to rest perfect centered isn't always possible.
+// Define the joystick's center point and a small range beyond that
+// which we'll treat as center.
+
+const uint8_t JOYSTICK_CENTER = 127;
+const uint8_t JOYSTICK_CENTER_OFFSET = 20;
+
+// One of my controllers frequently returns joystick coordinates 0,0 when
+// the stick has not been touched. I'm calling this event a crazyIvan.
+// The following constant is meant to adjust the sensitivity.
+
+#ifdef PS3_NAVIGATION
+const uint8_t CRAZYIVAN_THRESHOLD = 50;
+#endif
+
+
+/* =============================================
+ *           Configure fault detection
+ * ============================================= */
+
+// The following constants should be in milliseconds.
+
+const int LAG_TIME_TO_KILL_MOTORS  = 300;
+const int LAG_TIME_TO_DISCONNECT   = 10000;
+const int LAG_TIME_TO_RECONNECT    = 200;
+
+// Critical fault detection includes reviewing the controllers status for 'plugged' and 'unplugged'.
+// We allow two attempts to get a clear update. I am using a state machine (a flag and timer) instead
+// of the delay() command to control when a second attempt is made. The following constants determine
+// how much time should pass between attempts based on the presence or absence of another controller.
+
+const int PLUGGED_STATE_INTERVAL_ALONE = 15;  // This is the interval when no other controller is connected
+const int PLUGGED_STATE_INTERVAL_OTHER = 100; // This is the interval when another controller is connected.
 
 
 /* ==================================================
@@ -91,86 +90,21 @@ const String BACKUP_CONTROLLER_MAC = "xx:xx:xx:xx:xx:xx";
 
 // Uncomment the elements you have running in your astromech.
 
-//#define DRIVE             // Uncomment this when you have connected the foot motors and controller(s).
-#define DOME              // Uncomment this when you have connected the dome motor.
-#define MARCDUINO         // Uncomment this when you have at least one Marcduino master.
-//#define MD_BODY_MASTER    // Uncomment this if you are using the optional Marcduino body master.
-//#define MD_BODY_SOUND     // Uncomment this if sound is sent to the body master.
-//#define HOLOPROJECTORS    // Uncomment this if you are using at least 1 holoprojector. Max 3 holos.
-//#define LOGIC_DISPLAYS    // Uncomment this if you are using Teeces logic display.
-//#define DOME_PANELS       // Uncomment this if you are using at least 1 dome panel. Max 10 panels.
-//#define BODY_PANELS       // Uncomment this if you are using at least 1 body panel. Max 10 panels.
-//#define MAGIC_PANEL       // Uncomment this if you are using a magic panel in the dome.
+//#define DOME               // Uncomment this when you have connected the foot motors and controller(s).
+//#define DRIVE              // Uncomment this when you have connected the dome motor.
+#define MARCDUINO          // Uncomment this when you have at least one Marcduino master.
+#define MD_STD_CONTROLS    // Uncomment this when you use the standard SHADOW_MD controls.
+//#define MD_CUSTOM_CONTROLS // Uncomment this when you use your own custom Marcduino controls. (Advanced setting)
+#define MD_BODY_MASTER     // Uncomment this if you are using the optional Marcduino body master.
+#define MD_BODY_SOUND      // Uncomment this if sound is sent to the body master.
+
+
+/* =================================================
+ *                 Serial Baud Rates
+ * ================================================= */
 const int MARCDUINO_BAUD_RATE = 9600; // Do not change this!
-
-
-/* ======================================================
- *            Configure your dome motor options
- * ====================================================== */
-// These are fairly advanced settings.  Recommended: Do not tinker with these.
-
-const byte I2C_DOME_ADDRESS = 0x01;
-const int SYREN_ADDR = 129;    // Serial Address for Dome Syren
-
-const byte DOME_SPEED = 100;   // If using a speed controller for the dome, sets the top speed
-                               // Use a number up to 127 for serial
-
-const byte JOYSTICK_DOME_DEAD_ZONE_RANGE = 10;  // For controllers that centering problems, use the lowest number with no drift
-
-const int INVERT_TURN_DIRECTION = -1;   // This may need to be set to 1 for some configurations
-const byte DOME_AUTO_SPEED = 127;       // Speed used when dome automation is active (1- 127)
-const int TIME_360_DOME_TURN_LEFT = 1000; // milliseconds for dome to complete 360 turn at DOME_AUTO_SPEED
-const int TIME_360_DOME_TURN_RIGHT = 300; // milliseconds for dome to complete 360 turn at DOME_AUTO_SPEED
-                                          // Cut in half to reduce spin.  Offset for different rotation startups due to gearing.
-const int SERIAL_LATENCY = 25;  //This is a delay factor in ms to prevent queueing of the Serial data.
-                                //25ms seems appropriate for HardwareSerial, values of 50ms or larger are needed for Softare Emulation
-
-
-/* =========================================================
- *            Configure your foot motor options
- * ========================================================= */
-// Set the following variable according to which system you use for your foot motor controller.
-
-const int FOOT_CONTROLLER = 1;    // 0 = Sabertooth Serial
-                                  // 1 = R/C output; BHD mixing code included; Roboteq 1360 uses this
-                                  // 2 = R/C output; BHD mixing code removed; Roboteq 2360 uses this
-                                  
-
-// The following settings are fairly advanced.  Tinker with them after you've
-// studied the code to learn their use, or have talked with members for support.
-
-const byte DRIVESPEED1 = 25;  // Set these to whatever speed work for you. 0-stop, 127-full speed.
-const byte DRIVESPEED2 = 65;  // Recommend beginner: 50 to 75, experienced: 100 to 127, I like 100.
-
-//
-// The following are specific to the Sabertooth.
-//
-const int MOTOR_BAUD_RATE = 9600; // Set the baud rate for the Syren motor controller, also used by Sabertooth,
-                                  // for packetized options are: 2400, 9600, 19200 and 38400
-
-const int SABERTOOTH_ADDR = 128;       // Serial address for foot Sabertooth
-const byte DRIVE_DEAD_BAND_RANGE = 10; // Used to set the Sabertooth DeadZone for foot motors
-
-const byte TURN_SPEED = 75; //50; // Set this to whatever speed work for you. 0-stop, 127-full speed.
-                                  // The higher this number the faster it will spin in place, lower - easier to control.
-                                  // Recommend beginner: 40 to 50, experienced: 50 and up, I like 75
-
-const byte RAMPING = 6; //3;  // The lower this number the longer R2 will take to speedup
-                              // or slow down, change this by increments of 1
-
-const byte JOYSTICK_FOOT_DEAD_ZONE_RANGE = 15; // For controllers that have centering problems,
-                                               // use the lowest number with no drift
-
-//
-// The following are specific to RC controllers.
-//
-const int LEFT_FOOT_PIN   = 44;  // connect this pin to motor controller for left foot (R/C mode)
-const int RIGHT_FOOT_PIN  = 45;  // connect this pin to motor controller for right foot (R/C mode)
-//    const int LEFT_DIRECTION  = 1;   // change this if your motor is spinning the wrong way
-//    const int RIGHT_DIRECTION = 0;   // change this if your motor is spinning the wrong way
-//    const int STEERING_FACTOR = 100; // The larger SteeringFactor is the less senstitive steering is...
-//                                     // Smaller values give more accuracy in making fine steering corrections
-//                                     // XDist*sqrt(XDist+SteeringFactor)
+const int MOTOR_BAUD_RATE     = 9600; // Set the baud rate for the Syren motor controller, also used by Sabertooth,
+                                      // for packetized options are: 2400, 9600, 19200 and 38400
 
 
 /* =================================================
@@ -225,44 +159,6 @@ const int SERVOMAX = 600;  // This is the 'maximum' pulse length count (out of 4
 #endif
 
 
-/* =========================================================
- *            Configure your holoprojector options
- * ========================================================= */
-#ifdef HOLOPROJECTORS
-const uint8_t NUMBER_OF_HOLOPROJECTORS = 3;
-
-// ========== Advanced Holoprojector Settings ==========
-
-const bool isFrontHoloManuallyControlled = true;
-const int HOLO_DELAY = 20000; // up to 20 second delay
-
-// Servo range settings.
-
-const int HOLO_SERVO_CTR = 300;
-
-const int HOLO_FRONT_X_SERVO_MIN = 265; //250; //150;  // Issues with resin holo...
-const int HOLO_FRONT_X_SERVO_MAX = 315; //350; //600;  // Issues with resin holo...
-const int HOLO_FRONT_Y_SERVO_MIN = 250; //200; //150;  // Issues with resin holo...
-const int HOLO_FRONT_Y_SERVO_MAX = 330; //400; //600;  // Issues with resin holo...
-
-const int HOLO_BACK_X_SERVO_MIN = 275; //250; //150;
-const int HOLO_BACK_X_SERVO_MAX = 325; //350; //600; 
-const int HOLO_BACK_Y_SERVO_MIN = 250; //200; //150;
-const int HOLO_BACK_Y_SERVO_MAX = 350; //400; //600; 
-
-const int HOLO_TOP_X_SERVO_MIN = 275; //250; //150;
-const int HOLO_TOP_X_SERVO_MAX = 325; //350; //600; 
-const int HOLO_TOP_Y_SERVO_MIN = 250; //200; //150;
-const int HOLO_TOP_Y_SERVO_MAX = 350; //400; //600;
-
-// Set up random sound automation.  You can choose the
-// time between movements (delay min and max).
-
-const uint8_t AUTO_HP_DELAY_MIN = 3;   // in seconds
-const uint8_t AUTO_HP_DELAY_MAX = 25;  // in seconds
-#endif
-
-
 /* =======================================================
  *            Configure your dome panel settings
  * ======================================================= */
@@ -272,24 +168,79 @@ const uint8_t NUMBER_OF_DOME_PANELS = 10; // Specify how many dome panels are in
 
 
 /* =======================================================
- *            Configure your magic panel options
- * ======================================================= */
-#ifdef MAGIC_PANEL
-
-#ifndef MARCDUINO
-const uint8_t MAGIC_PANEL_DRIVER_NUMBER = 1;  // Change this to 2 only if your magic panel on the driver for your dome panels.
-const uint8_t MAGIC_PANEL_HEADER = 15;        // Which servo header number hosts the magic panel?
-#endif
-
-#endif
-
-
-/* =======================================================
  *            Configure your body panel settings
  * ======================================================= */
 #ifdef BODY_PANELS
 const uint8_t NUMBER_OF_BODY_PANELS = 10; // Specify how many body panels are in use.
 #endif
+
+
+/* ======================================================
+ *            Configure your dome motor options
+ * ====================================================== */
+// These are fairly advanced settings.  Recommended: Do not tinker with these.
+
+const int SYREN_ADDR = 129;    // Serial Address for Dome Syren
+
+const byte DOME_SPEED = 100;   // If using a speed controller for the dome, sets the top speed
+                               // Use a number up to 127 for serial
+
+const byte I2C_DOME_ADDRESS = 0x01;
+
+const byte JOYSTICK_DOME_DEAD_ZONE_RANGE = 10;  // For controllers that centering problems, use the lowest number with no drift
+
+const int INVERT_TURN_DIRECTION = -1;   // This may need to be set to 1 for some configurations
+const byte DOME_AUTO_SPEED = 127;       // Speed used when dome automation is active (1- 127)
+const int TIME_360_DOME_TURN_LEFT = 1000; // milliseconds for dome to complete 360 turn at DOME_AUTO_SPEED
+const int TIME_360_DOME_TURN_RIGHT = 300; // milliseconds for dome to complete 360 turn at DOME_AUTO_SPEED
+                                          // Cut in half to reduce spin.  Offset for different rotation startups due to gearing.
+const int SERIAL_LATENCY = 25;  //This is a delay factor in ms to prevent queueing of the Serial data.
+                                //25ms seems appropriate for HardwareSerial, values of 50ms or larger are needed for Softare Emulation
+
+
+/* =========================================================
+ *            Configure your foot motor options
+ * ========================================================= */
+// Set the following variable according to which system you use for your foot motor controller.
+
+const int FOOT_CONTROLLER = 1;    // 0 = Sabertooth Serial
+                                  // 1 = R/C output; Roboteq SBL2360 uses this
+                                  // 2 = R/C output with remixing; Roboteq SBL1360 uses this
+// R/C uses Servo objects _leftFootSignal (pin 44 aka throttle) and _rightFootSignal (pin 45 aka direction)
+
+// The following settings are fairly advanced.  Tinker with them only after you've
+// studied the code to learn their use, or have talked with members for support.
+
+const byte DRIVESPEED1 = 25;  // Set these to whatever speed work for you. 0-stop, 127-full speed.
+const byte DRIVESPEED2 = 65;  // Recommend beginner: 50 to 75, experienced: 100 to 127.
+
+//
+// The following are specific to the Sabertooth.
+//
+const int SABERTOOTH_ADDR = 128;       // Serial address for foot Sabertooth
+
+const byte TURN_SPEED = 75; //50; // Set this to whatever speed work for you. 0-stop, 127-full speed.
+                                  // The higher this number the faster it will spin in place, lower - easier to control.
+                                  // Recommend beginner: 40 to 50, experienced: 50 and up, I like 75
+
+const byte RAMPING = 6; //3;  // The lower this number the longer R2 will take to speedup
+                              // or slow down, change this by increments of 1
+
+const byte JOYSTICK_FOOT_DEAD_ZONE_RANGE = 15; // For controllers that have centering problems,
+                                               // use the lowest number with no drift
+
+const byte DRIVE_DEAD_BAND_RANGE = 10;         // Used to set the Sabertooth DeadZone for foot motors
+
+//
+// The following are specific to RC controllers.
+//
+const int LEFT_FOOT_PIN   = 44;  // connect this pin to motor controller for left foot (R/C mode)
+const int RIGHT_FOOT_PIN  = 45;  // connect this pin to motor controller for right foot (R/C mode)
+const int STEERING_FACTOR = 100; // The larger SteeringFactor is the less senstitive steering is...
+                                 // Smaller values give more accuracy in making fine steering corrections
+                                 // XDist*sqrt(XDist+SteeringFactor)
+//    const int LEFT_DIRECTION  = 1;   // change this if your motor is spinning the wrong way
+//    const int RIGHT_DIRECTION = 0;   // change this if your motor is spinning the wrong way
 
 
 #endif
