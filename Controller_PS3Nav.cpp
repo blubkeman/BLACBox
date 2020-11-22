@@ -1,30 +1,58 @@
 /* =================================================================================
  *    B.L.A.C.Box: Brian Lubkeman's Astromech Controller
  * =================================================================================
- * Controller_PS3Nav.cpp - Library for a PS3 Move Navigation controller
- * Created by Brian Lubkeman, 22 October 2020
+ * Controller_PS3Nav.cpp - Library for the subclass for the PS3 Move Navigation controller
+ * Created by Brian Lubkeman, 22 November 2020
  * Inspired by S.H.A.D.O.W. controller code written by KnightShade
  * Released into the public domain.
  */
 #include "Arduino.h"
 #include "Controller_PS3Nav.h"
 
+#if defined(PS3_NAVIGATION)
+
 /* ============================================
  *           Authorized MAC Addresses
  * ============================================ */
-const char * AUTHORIZED_MAC_ADDRESSES[2] = { "00:06:F7:B8:57:01", "E0:AE:5E:38:E0:CD" };
+char * PS3NAV_MAC_ADDRESSES[NUMBER_OF_MAC_ADDRESSES] = {
+  "00:06:F7:B8:57:01"
+, "E0:AE:5E:38:E0:CD"
+};
 
+
+/* ===========================================================================
+ *                     Controller_PS3Nav subclass functions
+ * =========================================================================== */
 
 // =====================
 //      Constructor
 // =====================
-Controller_PS3Nav::Controller_PS3Nav(Buffer * pBuffer) : _Usb(), _Btd(&_Usb), _primary(&_Btd), _secondary(&_Btd)
+Controller_PS3Nav::Controller_PS3Nav(Buffer * pBuffer) : Controller_Parent(pBuffer), _controller(&_Btd), _secondController(&_Btd)
 {
-  // Access the buffer.
+  _buffer->buttonLabel[0] = "Up(Nav1)";
+  _buffer->buttonLabel[1] = "Right(Nav1)";
+  _buffer->buttonLabel[2] = "Down(Nav1)";
+  _buffer->buttonLabel[3] = "Left(Nav1)";
+  _buffer->buttonLabel[4] = "Cross";
+  _buffer->buttonLabel[5] = "Circle";
+  _buffer->buttonLabel[6] = "L3";
+  _buffer->buttonLabel[7] = "R3";
+  _buffer->buttonLabel[8] = "L2";
+  _buffer->buttonLabel[9] = "R2";
+  _buffer->buttonLabel[10] = "L1";
+  _buffer->buttonLabel[11] = "R1";
+  _buffer->buttonLabel[12] = "Up(Nav2)";
+  _buffer->buttonLabel[13] = "Right(Nav2)";
+  _buffer->buttonLabel[14] = "Down(Nav2)";
+  _buffer->buttonLabel[15] = "Left(Nav2)";
+  _buffer->buttonLabel[16] = "PS(Nav1)";
+  _buffer->buttonLabel[17] = "";
+  _buffer->buttonLabel[18] = "";
+  _buffer->buttonLabel[19] = "PS(Nav2)";
 
-  _buffer = pBuffer;
-
-  // Prepare for debugging
+  // ----------
+  // Debugging.
+  // ----------
 
   #if defined(DEBUG_CONTROLLER) || defined(DEBUG_ALL)
   _className = F("Controller_PS3Nav::");
@@ -36,19 +64,25 @@ Controller_PS3Nav::Controller_PS3Nav(Buffer * pBuffer) : _Usb(), _Btd(&_Usb), _p
 // =================
 void Controller_PS3Nav::begin(void)
 {
-  // Start the USB host.
+  // -------------------
+  // Start the USB Host.
+  // -------------------
 
-  if (_Usb.Init() == -1) {
-    Serial.println(F("OSC did not start"));
-    while (1); //halt
-  }
-  Serial.println(F("Bluetooth Library Started"));
-
-  // Setup the attachOnInit;
+  Controller_Parent::begin();
+  
+  // ---------------------------
+  // Setup for the attachOnInit.
+  // ---------------------------
 
   anchor = this;
-  _primary.attachOnInit(_onInit);
-  _secondary.attachOnInit(_onInit);
+  _controller.attachOnInit(_onInit);
+  _secondController.attachOnInit(_onInit);
+
+  #if defined(DEBUG_CONTROLLER) || defined(DEBUG_ALL)
+  output = _className+F("begin()");
+  output += F(" - PS3 Navigation controller started.");
+  printOutput();
+  #endif
 }
 
 // ================
@@ -56,125 +90,102 @@ void Controller_PS3Nav::begin(void)
 // ================
 bool Controller_PS3Nav::read()
 {
-  // The more devices we have connected to the USB or BlueTooth, the 
-  // more often Usb.Task needs to be called to eliminate latency.
+
+  // --------------------------------------------------------------------
+  // The main program will handle stopping the motors if this read fails.
+  //
+  // Reasons this read may fail:
+  // ---------------------------
+  // 1. The primary controller is not connected.
+  // 2. The primary controller throws a critical fault.
+  // 3. The secondary controller throws a critical fault.
+  // 4. The user disconnects the primary controller.
+  // --------------------------------------------------------------------
+
+  // ---------------------------------
+  // Get input from the controller(s).
+  // ---------------------------------
 
   _Usb.Task();
-  if (_primary.PS3NavigationConnected) _Usb.Task();
-  if (_secondary.PS3NavigationConnected) _Usb.Task();
+  if ( ! _controller.PS3NavigationConnected ) {
 
-  // When we have no controllers,
+    // When using the deadman switch, if it was active when we lost the
+    // controller, make certain the deadman switch is turned off.
 
-  if ( ! _primary.PS3NavigationConnected &&  ! _secondary.PS3NavigationConnected ) {
+    #if defined(DEADMAN)
+    if ( digitalRead(DEADMAN_PIN) == HIGH )
+      digitalWrite(DEADMAN_PIN, LOW);
+    #endif
 
-    // make sure the buffer matches the controller status,
-
-    if (_buffer->isPrimaryConnected())   { _disconnectController(&_primary, PRIMARY); }
-    if (_buffer->isSecondaryConnected()) { _disconnectController(&_secondary, SECONDARY); }
-
-    // stop any run-away motors,
-
-    if ( ! _buffer->isFootStopped() ) { _buffer->stopFootMotor(); }
-    if ( ! _buffer->isDomeStopped() ) { _buffer->stopDomeMotor(); }
-
-    // and stop this read.
-
+    if ( ! _faultData.reconnect )
+      _faultData.reconnect = true;
     return false;
-  }
-
-  // At this point, we have at least one controller connected.
-
-  if ( ! _primary.PS3NavigationConnected ) {
-
-    // Primary is disconnected.
-    // Make sure the buffer matches the controller status, and stop a run-away motor.
-    
-    if (_buffer->isPrimaryConnected()) { _disconnectController(&_primary, PRIMARY); }
-    if ( ! _buffer->isFootStopped() ) { _buffer->stopFootMotor(); }
-
   } else {
-
-    // Primary is connected.
-    // Handle for any 'awaiting reconnection' status.
-
-    _checkReconnect(&_primary, PRIMARY);
+    if ( _detectCriticalFault(&_faultData) ) {
+      printOutput();
+      return false;
+    }
   }
-  
-  if ( ! _secondary.PS3NavigationConnected ) {
 
-    // Secondary is disconnected.
-    // Make sure the buffer matches the controller status.
-    // We do not check the dome motor because the primary controller can still control it.
-    
-    if (_buffer->isSecondaryConnected()) { _disconnectController(&_secondary, SECONDARY); }
-
+  _Usb.Task();
+  if ( ! _secondController.PS3NavigationConnected ) {
+    if ( ! _secondFaultData.reconnect )
+      _secondFaultData.reconnect = true;
   } else {
-
-    // Secondary is connected.
-    // Handle for any 'awaiting reconnection' status.
-
-    _checkReconnect(&_secondary, SECONDARY);
-
+    if ( _detectCriticalFault(&_secondFaultData) ) {
+      printOutput();
+      return false;
+    }
   }
 
-  // Look for critical faults. Stop this read when any are detected.
+  // --------------------------------------------------
+  // If we get this far then ours controllers are good.
+  // --------------------------------------------------
 
-  if (_detectCriticalFault(&_primary, PRIMARY) || 
-      _detectCriticalFault(&_secondary, SECONDARY)) {
+  // ------------------------------
+  // Take a snapshot of the inputs.
+  // ------------------------------
+
+  _updateBuffer();
+
+  // ----------------------------------------------
+  // Respond to any user-issued disconnect (L2+PS).
+  // ----------------------------------------------
+
+  // -------------------------------------
+  // Check the secondary controller first.
+  // -------------------------------------
+
+  if ( _buffer->getButton(PS2) && ( _buffer->getButton(R2) || _buffer->getButton(L2))) {
 
     #if defined(DEBUG_CONTROLLER) || defined(DEBUG_ALL)
     output = _className+F("read()");
-    output += F(" - Critical fault detected.");
-    Serial.println(output);
+    output += F(" - Disconnecting due to user request");
+    printOutput();
     #endif
-    
-    return false;
+
+    _disconnect(&_secondController);
   }
 
-  // Take a snapsot of the input from the controller(s).
+  // ---------------------------------
+  // Now check the primary controller.
+  // ---------------------------------
 
-  _setBuffer();
-
-  // Look for and handle any disconnect command from the user.
-  // A disconnect may be issued using L2+PS.
-
-  if (_secondary.PS3NavigationConnected &&
-      _buffer->getButton(L2) &&
-      _buffer->getButton(PS2)) {
-
-      #if defined(DEBUG_CONTROLLER) || defined(DEBUG_ALL)
-      output = _className+F("read()");
-      output += F(" - User disconnected secondary controller");
-      Serial.println(output);
-      #endif
-  
-      _disconnectController(&_secondary, SECONDARY);
-  }
-
-  if (_primary.PS3NavigationConnected &&
-      _buffer->getButton(L2) &&
-      _buffer->getButton(PS)) {
+  if ( _buffer->getButton(PS) && ( _buffer->getButton(R2) || _buffer->getButton(L2))) {
 
     #if defined(DEBUG_CONTROLLER) || defined(DEBUG_ALL)
     output = _className+F("read()");
-    output += F(" - User disconnected primary controller");
-    Serial.println(output);
+    output += F(" - Disconnecting due to user request");
+    printOutput();
     #endif
 
-    _disconnectController(&_primary, PRIMARY);
+    _disconnect(&_controller);
+    return false;
   }
 
-  // Optionally, display controller input to the serial monitor.
-
-  #ifdef TEST_CONTROLLER
-  if ( &_primary.PS3NavigationConnected || &_secondary.PS3NavigationConnected ) {
-
-    // It is strongly recommended to uncomment only one of these two lines at a time.
-
-    _buffer->testInput();
-    //_buffer->scrollInputer;
-  }
-  #endif
+  // -------------
+  // Read is done.
+  // -------------
 
   return true;
 }
@@ -197,7 +208,7 @@ static void Controller_PS3Nav::_onInit(void)
 
     #if defined(DEBUG_CONTROLLER) || defined(DEBUG_ALL)
     output = F("Controller_PS3Nav::_onInit() - Controller initialization started.");
-    Serial.println(output);
+    printOutput();
     #endif
 
     anchor->_onInitConnect();
@@ -209,29 +220,39 @@ static void Controller_PS3Nav::_onInit(void)
 // ========================
 void Controller_PS3Nav::_onInitConnect(void)
 {
+  // ---------------------------------------------------------------
   // Always try to assign as primary first.
   // Assign as secondary only when the primary is already connected.
+  // ---------------------------------------------------------------
 
-  if ( ! _buffer->isPrimaryConnected() ) {
-
-    #if defined(DEBUG_CONTROLLER) || defined(DEBUG_ALL)
-    output = _className+F("_onInitConnect()");
-    output += F(" - Initiating connection with primary.");
-    Serial.println(output);
-    #endif
-
-    _connectController(&_primary, PRIMARY);
-
-  } else if ( ! _buffer->isSecondaryConnected() ) {
+  if ( ! _buffer->isControllerConnected() ) {
 
     #if defined(DEBUG_CONTROLLER) || defined(DEBUG_ALL)
     output = _className+F("_onInitConnect()");
-    output += F(" - Initiating connection with secondary.");
-    Serial.println(output);
+    output += F(" - Initiating connection with ");
+    output += F("primary");
+    output += F(" controller.");
+    printOutput();
     #endif
 
-    _connectController(&_secondary, SECONDARY);
+    _connect(&_controller);
+
+  } else if ( ! _buffer->isFullControllerConnected() ) {
+
+    #if defined(DEBUG_CONTROLLER) || defined(DEBUG_ALL)
+    output = _className+F("_onInitConnect()");
+    output += F(" - Initiating connection with ");
+    output += F("secondary");
+    output += F(" controller.");
+    printOutput();
+    #endif
+
+    _connect(&_secondController);
   }
+
+  #if defined(DEBUG_CONTROLLER) || defined(DEBUG_ALL)
+  printOutput();
+  #endif
 }
 
 
@@ -239,407 +260,313 @@ void Controller_PS3Nav::_onInitConnect(void)
  *          Connection functions
  * ======================================= */
  
-// ============================
-//      _connectController
-// ============================
-void Controller_PS3Nav::_connectController(PS3BT * controller, uint8_t priority)
+// ==================
+//      _connect
+// ==================
+void Controller_PS3Nav::_connect(PS3BT * pController)
 {
+  // ----------------------------------------------------------------------------------
   // First, let's make sure we have a PS3 Move Navigation controller.  If not, drop it.
+  // ----------------------------------------------------------------------------------
 
-  if ( ! controller->PS3NavigationConnected ) {
-
-    controller->disconnect();
+  if ( ! pController->PS3NavigationConnected ) {
 
     #if defined(DEBUG_CONTROLLER) || defined(DEBUG_ALL)
-    output = _className+F("_connectController()");
-    output += F(" - Disconnecting invalid controller.");
-    Serial.println(output);
+    output = _className+F("_connect()");
+    output += F(" - Disconnecting");
+    output += F(" invalid");
+    output += F(" controller.");
+    printOutput();
     #endif
 
+    pController->disconnect();
     return;
   }
 
-  // Get the MAC address of the controller.
-  // Display the MAC address on the serial monitor before checking for authorization.
+  // --------------------------------------------------
+  // Get the MAC address of the controller and validate
+  // against our list of authorized devices.
+  // --------------------------------------------------
 
-  String btAddress;
-  for(int8_t i = 5; i >= 0; i--) {
-    if (btAddress.length() > 0) btAddress +=(":");
-    if (_Btd.disc_bdaddr[i]<0x10) btAddress +="0";
-    btAddress += String(_Btd.disc_bdaddr[i], HEX);
-  }
-  btAddress.toUpperCase();
+  if ( ! _authorized(PS3NAV_MAC_ADDRESSES, sizeof(PS3NAV_MAC_ADDRESSES)) ) {
 
-  #if defined(DEBUG_CONTROLLER) || defined(DEBUG_ALL)
-  output = _className+F("_connectController()");
-  output += F(" - MAC address: ");
-  output += btAddress;
-  Serial.println(output);
-  #endif
-
-  // Validate the MAC address against our authorized devices.
-
-  bool authorized = false;
-
-  for (uint8_t i = 0; i < sizeof(AUTHORIZED_MAC_ADDRESSES); i++) {
-    if (btAddress == AUTHORIZED_MAC_ADDRESSES[i]) {
-      authorized = true;
-      break;
-    }
-  }
-
-  if (! authorized) {
-
+    // --------------------------------------------
     // This is an unauthorized controller. Dump it.
-
-    controller->disconnect();
+    // --------------------------------------------
 
     #if defined(DEBUG_CONTROLLER) || defined(DEBUG_ALL)
-    output = _className+F("_connectController()");
-    output += F(" - Disconnecting unauthorized controller.");
-    Serial.println(output);
+    output = _className+F("_connect()");
+    output += F(" - Disconnecting");
+    output += F(" unauthorized");
+    output += F(" controller.");
+    printOutput();
     #endif
 
+    pController->disconnect();
     return;
   }
 
-  // Display which controller was connected.
-
   #if defined(DEBUG_CONTROLLER) || defined(DEBUG_ALL)
-  output = _className+F("_connectController()");
-  if (priority == PRIMARY)
-    output += F(" - Primary controller connected.");
-  else if (priority == SECONDARY)
-    output += F(" - Secondary controller connected.");
-  Serial.println(output);
+  else
+    output = _className+F("_connect()");
+    output += F(" - Controller authorized.");
+    printOutput();
   #endif
 
-  // Turn on the controller's LED light.
+  // --------------------
+  // Complete connection.
+  // --------------------
 
-  controller->setLedOn(LED1);
+  _buffer->setControllerConnected(HALF);
+  _initCriticalFault(&_faultData);
+  pController->setLedOn(LED1);
 
-  // Prepare the critical fault data.
+  // ---------------------------------------
+  // Display which controller was connected.
+  // ---------------------------------------
 
-  _initFaultData(priority);
-
-  // Set the connected flag in the buffer so that peripherals may query the connection status.
-
-  if (priority == PRIMARY) {
-    _buffer->setPrimaryConnected(true);
-  } else if (priority = SECONDARY) {
-    _buffer->setSecondaryConnected(true);
-  }
-
+  #if defined(DEBUG_CONTROLLER) || defined(DEBUG_ALL)
+  output = _className+F("_connect()");
+  output += F(" - Controller connected.");
+  printOutput();
+  #endif
 }
 
-// =================================
-//      _disconnectController()
-// =================================
-void Controller_PS3Nav::_disconnectController(PS3BT * controller, uint8_t priority)
+// =======================
+//      _disconnect()
+// =======================
+void Controller_PS3Nav::_disconnect(PS3BT * pController)
 {
-  // Set the connected flag in the buffer so that peripherals may query the connection status.
+  uint8_t priority = FIRST;
+  if (pController == &_secondController)
+    priority = SECOND;
 
-  if (priority == PRIMARY) {
+  if ( priority == FIRST && _buffer->isFullControllerConnected() )
+    _disconnect(&_secondController);
 
-    _buffer->setPrimaryConnected(false);
-    _buffer->setFootEnabled(false);
-
-  } else if (priority == SECONDARY) {
-
-    _buffer->setSecondaryConnected(false);
-    if ( ! _buffer->isPrimaryConnected() ) {
-      _buffer->setDomeEnabled(false);
-    }
+  if ( priority == FIRST ) {
+    _buffer->setControllerConnected(NONE);
+    _resetCriticalFault(&_faultData);
+  } else if ( priority == SECOND ) {
+    _buffer->setControllerConnected(HALF);
+    _resetCriticalFault(&_secondFaultData);
   }
 
-  // Complete the disconnect.
-
-  controller->disconnect();
-  controller->setLedOff(LED1);
-
-  // Display which controller was disconnected.
+  pController->setLedOff(LED1);
+  pController->disconnect();
 
   #if defined(DEBUG_CONTROLLER) || defined(DEBUG_ALL)
-  output = _className+F("_disconnectController()");
-  output += F(" - Disconnected ");
-  output += _faultData[priority].priority;
-  output += F(" controller.");
-  Serial.println(output);
+  output = _className+F("_disconnect()");
+  output += F(" - ");
+  if ( priority == FIRST )
+    output += F("Primary");
+  else
+    output += F("Secondary");
+  output += F(" controller disconnected");  
+  printOutput();
   #endif
-
-  // Reset the critical fault data.
-
-  _resetCriticalFault(controller, priority);
-
-  // If we just dumped the primary controller and still have a secondary then
-  // drop the secondary as well. This will force the droid into quiet mode
-  // and require us to reconnect all controllers.
-
-  if ( ! _buffer->isPrimaryConnected() && _buffer->isSecondaryConnected() )
-    _disconnectController(&_secondary, SECONDARY);
 }
 
 /* =====================================================
  *          Critical fault detection functions
  * ===================================================== */
 
-// ==========================
-//      _initFaultData()
-// ==========================
-void Controller_PS3Nav::_initFaultData(uint8_t priority)
+// ==============================
+//      _initCriticalFault()
+// ==============================
+void Controller_PS3Nav::_initCriticalFault(CriticalFault_Struct * pFaultData)
 {
-  _faultData[priority].badData            = 0;
-  _faultData[priority].lastMsgTime        = -1;
-  _faultData[priority].pluggedState       = false;
-  _faultData[priority].pluggedStateTime   = 0;
-  _faultData[priority].waitingToReconnect = false;
-
-  if (priority == PRIMARY)
-    _faultData[priority].priority = "Primary";
-  else if (priority == SECONDARY)
-    _faultData[priority].priority = "Secondary";
+  pFaultData->badData          = 0;
+  pFaultData->lastMsgTime      = millis();
+  pFaultData->pluggedStateTime = 0;
+  pFaultData->reconnect        = true;
 
   #if defined(DEBUG_CONTROLLER) || defined(DEBUG_ALL)
-  output = _className+F("_initFaultData()");
+  output = _className+F("_initCriticalFault()");
   output += F(" - Critical fault data initialized.");
-  Serial.println(output);
+  printOutput();
   #endif
 }
-
 
 // ================================
 //      _detectCriticalFault()
 // ================================
-bool Controller_PS3Nav::_detectCriticalFault(PS3BT * controller, uint8_t priority)
+bool Controller_PS3Nav::_detectCriticalFault(CriticalFault_Struct * pFaultData)
 {
-  bool fault = false;
+  uint8_t priority = FIRST;
+  if (pFaultData == &_secondFaultData)
+    priority = SECOND;
 
-  if ( ! controller->PS3NavigationConnected )
-    return fault;
-
-  _lagTime = 0;
-  _currentTime = millis();
-
-  //--------------------------------------------------------
-  // Check for problems with lag time.
-  //--------------------------------------------------------
-
-  fault = _checkLag(controller, priority);
-  if (fault) { return fault; }
-
-  //--------------------------------------------------------
-  // When the controller is confused about its plugged vs
-  // unplugged status, increment our bad data counter.
-  // Disconnect when counter reaches 10.
-  //--------------------------------------------------------
-
-  fault = _checkSignal(controller, priority);
-
-  return fault;
-}
-
-// =====================
-//      _checkLag()
-// =====================
-bool Controller_PS3Nav::_checkLag(PS3BT * controller, uint8_t priority)
-{
-  bool fault = false;
-
-  // Calculate lag.
-
-  if (_currentTime > _faultData[priority].lastMsgTime)
-    _lagTime = _currentTime - _faultData[priority].lastMsgTime;
-  else
+  if ( _controller.PS3NavigationConnected ) {
+    _currentTime = millis();
     _lagTime = 0;
+    pFaultData->lastMsgTime = _controller.getLastMessageTime();
 
-  // Stop motors due to lag.
-  
-  if (_lagTime > LAG_TIME_TO_KILL_MOTORS && priority == PRIMARY) {
+    // -----------------------
+    // Check for reconnection.
+    // -----------------------
 
-    if ( ! _buffer->isFootStopped() ) { 
-  
-      #if defined(DEBUG_CONTROLLER) || defined(DEBUG_ALL)
-      output = _className+F("_checkLag() - ");
-      output += F(" -  Stopping foot motors due to lag time.");
-      Serial.println(output);
-      #endif
-  
-      _buffer->stopFootMotor();
-      _resetCriticalFault(controller, priority);
-      fault = true;
-    }
-  
-    if ( ! _buffer->isDomeStopped() && ! _buffer->isSecondaryConnected() ) {
-  
-      #if defined(DEBUG_CONTROLLER) || defined(DEBUG_ALL)
-      output = _className+F("_checkLag() - ");
-      output += F(" -  Stopping dome motor due to lag time.");
-      Serial.println(output);
-      #endif
-  
-      _buffer->stopDomeMotor();
-      _resetCriticalFault(controller, priority);
-      fault = true;
-    }
-  }
-
-  // Disconnect controller due to lag.
-
-  if (_lagTime > LAG_TIME_TO_DISCONNECT) {
-
-    #if defined(DEBUG_CONTROLLER) || defined(DEBUG_ALL)
-    output = _className+F("_checkLag() - ");
-    output += _faultData[priority].priority;
-    output += F("\r\n  Disconnecting due to lag.");
-    output += F("\r\n  Current time:  ");
-    output += _currentTime;
-    output += F("\r\n  Last msg time: ");
-    output += _faultData[priority].lastMsgTime;
-    output += F("\r\n  Lag:           ");
-    output += _lagTime;    
-    Serial.println(output);
-    #endif
-
-    _disconnectController(controller, priority);
-    fault = true;
-  }
-
-  return fault;
-}
-
-// ===========================
-//      _checkReconnect()
-// ===========================
-void Controller_PS3Nav::_checkReconnect(PS3BT * controller, uint8_t priority)
-{
-  _faultData[priority].lastMsgTime = (unsigned long)controller->getLastMessageTime();
-
-  if (_faultData[priority].waitingToReconnect) {
-
-    _lagTime = (_currentTime - _faultData[priority].lastMsgTime);
-
-    if (_lagTime < LAG_TIME_TO_RECONNECT) {
-
-      _faultData[priority].waitingToReconnect = false;
-
-      #if defined(DEBUG_CONTROLLER) || defined(DEBUG_ALL)
-      output = _className+F("_checkReconnect()");
-      output += F(" - ");
-      output += _faultData[priority].priority;
-      output += F("  reconnected.");
-      Serial.println(output);
-      #endif
-    }
-
-    _faultData[priority].lastMsgTime = _currentTime;
-  }
-}
-
-// ========================
-//      _checkSignal()
-// ========================
-bool Controller_PS3Nav::_checkSignal(PS3BT * controller, uint8_t priority)
-{
-  bool fault = false;
-
-  if ( controller->getStatus(Plugged) == controller->getStatus(Unplugged) ) {
-
-    // We want to check this status twice before deciding it truly is confused, but we need a
-    // little time to pass between checks. Original SHADOW code used delay() and repeated code
-    // to accomplish the two attempts. I am using a state machine (a flag and a timer) to avoid
-    // the full blown pause caused by delay().
-
-    if (_faultData[priority].pluggedState) {
-
-      // When we get inside this condition, we're into our second attempt, but we still
-      // need to give it a little time, an interval. Vary the timer's interval based on
-      // whether or not there is another controller present.
-
-      unsigned long interval = PLUGGED_STATE_INTERVAL_ALONE;
-      if ( (priority == PRIMARY && _buffer->isSecondaryConnected()) || 
-           (priority == SECONDARY && _buffer->isPrimaryConnected()) ) {
-        interval = PLUGGED_STATE_INTERVAL_OTHER;
+    if ( pFaultData->reconnect ) {
+      if ( _lagTime < LAG_TIME_TO_RECONNECT ) {
+        pFaultData->reconnect = false;
       }
+      pFaultData->lastMsgTime = _currentTime;
+    }
 
-      if (_currentTime > _faultData[priority].pluggedStateTime + interval) {
+    // ----------
+    // Check lag.
+    // ----------
 
-        // When we get this far, then we're still seeing a confused status, and we've
-        // passed the prescribed time interval. Increment our bad data counter, and
-        // reset the state machine.
+    if ( _currentTime >= pFaultData->lastMsgTime ) {
+      _lagTime = _currentTime - pFaultData->lastMsgTime;
+    } else {
+      _lagTime = 0;
+    }
 
+    if ( _lagTime > LAG_TIME_TO_DISCONNECT ) {
+
+      #if defined(DEBUG_CONTROLLER) || defined(DEBUG_ALL)
+      output = _className+F("_detectCriticalFault()");
+      output += F(" - Disconnecting due to lag time.");
+      output += F("\r\n  Current time:  ");  output += _currentTime;
+      output += F("\r\n  Last msg time: ");  output += _faultData.lastMsgTime;
+      output += F("\r\n  Lag:           ");  output += _lagTime;    
+      #endif
+      
+      if ( priority == FIRST )
+        _disconnect(&_controller);
+      else
+        _disconnect(&_secondController);
+      return true;
+    }
+
+    if ( priority == FIRST ) {
+
+      // ---------------------------------------------------------------
+      // This part is specific to the PS3 Navigation primary controller.
+      // ---------------------------------------------------------------
+      
+      if ( _lagTime > LAG_TIME_TO_KILL_MOTORS && ! _buffer->isDriveStopped() ) {
+  
         #if defined(DEBUG_CONTROLLER) || defined(DEBUG_ALL)
-        output = _className+F("_checkSignal()");
-        output += F(" - ");
-        output += _faultData[priority].priority;
-        output += F("\r\n  Invalid data from controller.");
-        Serial.println(output);
-        #endif
-
-        _faultData[priority].badData++;
-        _faultData[priority].pluggedState = false;
-        fault = true;
+        output = _className+F("_detectCriticalFault()");
+        output += F(" - Stopping drive motors due to lag.");
+        printOutput();
+        #endif      
+  
+        return true;  // The actual code to stop the motor is in loop() when read() fails.
       }
     }
+  
+    // --------------------------
+    // Check the PS3 signal data.
+    // --------------------------
 
-    // Here, we activate our state machine and start the timer.
+    if ( ! _controller.getStatus(Plugged) && ! _controller.getStatus(Unplugged) ) {
 
-    _faultData[priority].pluggedState = true;
-    _faultData[priority].pluggedStateTime = millis();
-    
-  } else {
+      // The controller's signal is confused. We'll give it two tries
+      // to clear up. The first time through starts the state machine.
+      // The second time through trips the critical fault.
 
-    // At this point, there is no confusion over the status of plugged vs unplugged.
-    // Reset the state machine if it had been activated.
+      if (pFaultData->pluggedStateTime > 0) {
 
-    if (_faultData[priority].pluggedState) {
-      _faultData[priority].pluggedState = false;
-      _faultData[priority].badData = 0;
+        // ------------------------------------------------------------
+        // Has the desired amount of time between failed checks passed?
+        // ------------------------------------------------------------
+        
+        unsigned long interval = (_buffer->isFullControllerConnected() ? PLUGGED_STATE_LONG_INTERVAL : PLUGGED_STATE_SHORT_INTERVAL);
+        if ( _currentTime > ( pFaultData->pluggedStateTime + interval )) {
+
+          // We have our second failed check.
+          // Trigger the critical fault and reset the state machine.
+
+          pFaultData->badData++;
+          pFaultData->pluggedStateTime = 0;
+
+          #if defined(DEBUG_CONTROLLER) || defined(DEBUG_ALL)
+          output = _className+F("_detectCriticalFault()");
+          output += F("\r\n - Invalid data from primary controller.");
+          #endif
+
+          return true;
+        }
+      } else {
+
+        // ------------------------
+        // Start the state machine.
+        // ------------------------
+
+        pFaultData->pluggedStateTime = millis();
+      }
+
+    } else {
+
+      // --------------------------------------------------------
+      // The controller is not confused. Reset the state machine.
+      // --------------------------------------------------------
+
+      if (pFaultData->badData > 0) {
+        pFaultData->pluggedStateTime = 0;
+        pFaultData->badData = 0;
+      }
+    }
+  
+    if (pFaultData->badData > 10) {
+
+      // ----------------------------------
+      // We have too much bad data coming
+      // from the controller. Shut it down.
+      // ----------------------------------
+
+      #if defined(DEBUG_CONTROLLER) || defined(DEBUG_ALL)
+      output = _className+F("_detectCriticalFault()");
+      output += F("\r\n - Disconnecting due to excessive bad data.");
+      #endif
+
+      if ( priority == FIRST )
+        _disconnect(&_controller);
+      else
+        _disconnect(&_secondController);
+      return true;
     }
   }
 
-  if (_faultData[priority].badData > 10) {
-
-    // We have too much bad data coming from the controller.
-    // Shut it down.
-
-    #if defined(DEBUG_CONTROLLER) || defined(DEBUG_ALL)
-    output = _className+F("_checkSignal()");
-    output += F(" - ");
-    output += _faultData[priority].priority;
-    output += F("\r\n  Disconnecting due to excessive bad data.");
-    Serial.println(output);
-    #endif
-
-    _disconnectController(controller, priority);
-    fault = true;
-  }
-
-  return fault;
+  return false;
 }
 
 // ===============================
 //      _resetCriticalFault()
 // ===============================
-void Controller_PS3Nav::_resetCriticalFault(PS3BT * controller, uint8_t priority)
+void Controller_PS3Nav::_resetCriticalFault(CriticalFault_Struct * pFaultData)
 {
-  _faultData[priority].badData = 0;
-  if (controller->getLastMessageTime() == 0)
-    _faultData[priority].lastMsgTime = -1;
-  else if ( ! controller->PS3NavigationConnected )
-    _faultData[priority].lastMsgTime = -1;
+  uint8_t priority = FIRST;
+  PS3BT * pController = &_controller;
+
+  if (pFaultData == &_secondFaultData) {
+    priority = SECOND;
+    pController = &_secondController;
+  }
+
+  pFaultData->badData = 0;
+  pFaultData->reconnect = true;
+  pFaultData->pluggedStateTime = 0;
+
+  if (pController->getLastMessageTime() == 0 || ! _controller.PS3NavigationConnected )
+    pFaultData->lastMsgTime = -1;
   else
-    _faultData[priority].lastMsgTime = controller->getLastMessageTime();
-  _faultData[priority].waitingToReconnect = true;
+    pFaultData->lastMsgTime = pController->getLastMessageTime();
 
   #if defined(DEBUG_CONTROLLER) || defined(DEBUG_ALL)
   output = _className+F("_resetCriticalFault()");
   output += F(" - ");
-  output += _faultData[priority].priority;
+  if ( priority == FIRST )
+    output += F("Primary");
+  else
+    output += F("Secondary");
   output += F(" critical fault data reset.");
-  Serial.println(output);
+  printOutput();
   #endif
 }
-
 
 /* ===================================
  *          Buffer functions
@@ -654,56 +581,130 @@ void Controller_PS3Nav::_setBuffer(void)
 
   _buffer->saveStick();
 
+  // ---------------------------------------------
   // Get button states for the primary controller.
+  // ---------------------------------------------
 
-  _buffer->setButton(UP,      _primary.getButtonClick(UP));
-  _buffer->setButton(RIGHT,   _primary.getButtonClick(RIGHT));
-  _buffer->setButton(DOWN,    _primary.getButtonClick(DOWN));
-  _buffer->setButton(LEFT,    _primary.getButtonClick(LEFT));
-  _buffer->setButton(SELECT,  _primary.getButtonPress(CROSS));
-  _buffer->setButton(START,   _primary.getButtonPress(CIRCLE));
-  _buffer->setButton(L3,      _primary.getButtonClick(L3));
-  _buffer->setButton(L2,      _primary.getAnalogButton(L2));
-  _buffer->setButton(L1,      _primary.getButtonPress(L1));
-  _buffer->setButton(PS,      _primary.getButtonPress(PS));
-  _buffer->setStick(LeftHatX, _primary.getAnalogHat(LeftHatX));
-  _buffer->setStick(LeftHatY, _primary.getAnalogHat(LeftHatY));
+  _buffer->setButton(UP,      _controller.getButtonClick(UP));
+  _buffer->setButton(RIGHT,   _controller.getButtonClick(RIGHT));
+  _buffer->setButton(DOWN,    _controller.getButtonClick(DOWN));
+  _buffer->setButton(LEFT,    _controller.getButtonClick(LEFT));
+  _buffer->setButton(SELECT,  _controller.getButtonPress(CROSS));
+  _buffer->setButton(START,   _controller.getButtonPress(CIRCLE));
+  _buffer->setButton(L3,      _controller.getButtonClick(L3));
+  _buffer->setButton(L2,      _controller.getAnalogButton(L2));
+  _buffer->setButton(L1,      _controller.getButtonPress(L1));
+  _buffer->setButton(PS,      _controller.getButtonPress(PS));
+  _buffer->setStick(LeftHatX, _controller.getAnalogHat(LeftHatX));
+  _buffer->setStick(LeftHatY, _controller.getAnalogHat(LeftHatY));
 
+  // -----------------------------------------------------------------------------
   // Get the button states for the secondary controller.
   // We can store some of these in the unused buttons from the primary controller.
+  // -----------------------------------------------------------------------------
 
-  if (_buffer->isSecondaryConnected()) {
-    _buffer->setButton(TRIANGLE, _secondary.getButtonClick(UP));
-    _buffer->setButton(CIRCLE,   _secondary.getButtonClick(RIGHT));
-    _buffer->setButton(CROSS,    _secondary.getButtonClick(DOWN));
-    _buffer->setButton(SQUARE,   _secondary.getButtonClick(LEFT));
-    _buffer->setButton(SELECT,  (_primary.getButtonPress(CROSS) + _secondary.getButtonPress(CROSS)) > 0 ? 1 : 0);
-    _buffer->setButton(START,   (_primary.getButtonPress(CIRCLE) + _secondary.getButtonPress(CIRCLE)) > 0 ? 1 : 0);
-    _buffer->setButton(R3,       _secondary.getButtonClick(L3));
-    _buffer->setButton(L2,      (_primary.getAnalogButton(L2) + _secondary.getAnalogButton(L2)) > 0 ? max(_primary.getAnalogButton(L2), _secondary.getAnalogButton(L2)) : 0);
-    _buffer->setButton(L1,      (_primary.getButtonPress(L1) + _secondary.getButtonPress(L1)) > 0 ? 1 : 0);
-    _buffer->setButton(PS2,      _secondary.getButtonPress(PS));
-    _buffer->setStick(RightHatX, _secondary.getAnalogHat(LeftHatX));
-    _buffer->setStick(RightHatY, _secondary.getAnalogHat(LeftHatY));
+  if (_buffer->isFullControllerConnected()) {
+    _buffer->setButton(TRIANGLE, _secondController.getButtonClick(UP));
+    _buffer->setButton(CIRCLE,   _secondController.getButtonClick(RIGHT));
+    _buffer->setButton(CROSS,    _secondController.getButtonClick(DOWN));
+    _buffer->setButton(SQUARE,   _secondController.getButtonClick(LEFT));
+    _buffer->setButton(SELECT,  (_controller.getButtonPress(CROSS) + _secondController.getButtonPress(CROSS)) > 0 ? 1 : 0);
+    _buffer->setButton(START,   (_controller.getButtonPress(CIRCLE) + _secondController.getButtonPress(CIRCLE)) > 0 ? 1 : 0);
+    _buffer->setButton(R3,       _secondController.getButtonClick(L3));
+    _buffer->setButton(R2,       _secondController.getAnalogButton(L2));
+    _buffer->setButton(R1,       _secondController.getButtonPress(L1));
+    _buffer->setButton(PS2,      _secondController.getButtonPress(PS));
+    _buffer->setStick(RightHatX, _secondController.getAnalogHat(LeftHatX));
+    _buffer->setStick(RightHatY, _secondController.getAnalogHat(LeftHatY));
   }
 
+  // -----------------------------------------
   // Check for and handle any crazyIvan event.
+  // -----------------------------------------
 
-  if (_primary.PS3NavigationConnected)
-    _crazyIvan(PRIMARY, LeftHatX, LeftHatY);
-  if (_secondary.PS3NavigationConnected)
-    _crazyIvan(SECONDARY, RightHatX, RightHatY);
+  if (_controller.PS3NavigationConnected)
+    _crazyIvan(FIRST, LeftHatX, LeftHatY);
+  if (_secondController.PS3NavigationConnected)
+    _crazyIvan(SECOND, RightHatX, RightHatY);
 
   #ifdef TEST_CONTROLLER
 
+  // ----------------------------------------------------------
   // Using only one of these at a time is strongly recommended.
+  // ----------------------------------------------------------
  
-  _buffer->testInput();
+  _buffer->displayInput();
   //_buffer->scrollInput();
-
   #endif
 }
 
+// =========================
+//      _updateBuffer()
+// =========================
+void Controller_PS3Nav::_updateBuffer(void)
+{
+  // ---------------------------------------------------------------
+  // Save the previous joystick values for critical fault detection.
+  // ---------------------------------------------------------------
+
+  _buffer->saveStick();
+
+  // ---------------------------------------------
+  // Get button states for the primary controller.
+  // ---------------------------------------------
+
+  _buffer->updateButton(UP,     _controller.getButtonClick(UP));
+  _buffer->updateButton(RIGHT,  _controller.getButtonClick(RIGHT));
+  _buffer->updateButton(DOWN,   _controller.getButtonClick(DOWN));
+  _buffer->updateButton(LEFT,   _controller.getButtonClick(LEFT));
+  _buffer->updateButton(SELECT, _controller.getButtonPress(CROSS));
+  _buffer->updateButton(START,  _controller.getButtonPress(CIRCLE));
+  _buffer->updateButton(L3,     _controller.getButtonClick(L3));
+  _buffer->updateButton(L2,     _controller.getAnalogButton(L2));
+  _buffer->updateButton(L1,     _controller.getButtonPress(L1));
+  _buffer->updateButton(PS,     _controller.getButtonPress(PS));
+  _buffer->setStick(LeftHatX,   _controller.getAnalogHat(LeftHatX));
+  _buffer->setStick(LeftHatY,   _controller.getAnalogHat(LeftHatY));
+
+  // -----------------------------------------------------------------------------
+  // Get the button states for the secondary controller.
+  // We can store some of these in the unused buttons from the primary controller.
+  // -----------------------------------------------------------------------------
+
+  if (_buffer->isFullControllerConnected()) {
+    _buffer->updateButton(TRIANGLE, _secondController.getButtonClick(UP));
+    _buffer->updateButton(CIRCLE,   _secondController.getButtonClick(RIGHT));
+    _buffer->updateButton(CROSS,    _secondController.getButtonClick(DOWN));
+    _buffer->updateButton(SQUARE,   _secondController.getButtonClick(LEFT));
+    _buffer->updateButton(SELECT,  (_controller.getButtonPress(CROSS) + _secondController.getButtonPress(CROSS)) > 0 ? 1 : 0);
+    _buffer->updateButton(START,   (_controller.getButtonPress(CIRCLE) + _secondController.getButtonPress(CIRCLE)) > 0 ? 1 : 0);
+    _buffer->updateButton(R3,       _secondController.getButtonClick(L3));
+    _buffer->updateButton(R2,       _secondController.getAnalogButton(L2));
+    _buffer->updateButton(R1,       _secondController.getButtonPress(L1));
+    _buffer->updateButton(PS2,      _secondController.getButtonPress(PS));
+    _buffer->setStick(RightHatX,    _secondController.getAnalogHat(LeftHatX));
+    _buffer->setStick(RightHatY,    _secondController.getAnalogHat(LeftHatY));
+  }
+
+  // -----------------------------------------
+  // Check for and handle any crazyIvan event.
+  // -----------------------------------------
+
+  if (_controller.PS3NavigationConnected)
+    _crazyIvan(FIRST, LeftHatX, LeftHatY);
+  if (_secondController.PS3NavigationConnected)
+    _crazyIvan(SECOND, RightHatX, RightHatY);
+
+  #ifdef TEST_CONTROLLER
+
+  // ----------------------------------------------------------
+  // Using only one of these at a time is strongly recommended.
+  // ----------------------------------------------------------
+ 
+  _buffer->displayInput();
+  //_buffer->scrollInput();
+  #endif
+}
 
 // ======================
 //      _crazyIvan()
@@ -725,14 +726,16 @@ void Controller_PS3Nav::_crazyIvan(uint8_t priority, uint8_t x, uint8_t y)
 
     #ifdef DEBUG_CRAZYIVAN
     output = _className+F("_crazyIvan()");
-    if (priority == PRIMARY)
+    if (priority == FIRST)
       output += F(" - Primary");
-    else if (priority == SECONDARY)
+    else if (priority == SECOND)
       output += F(" - Secondary");
     else
       output += F(" - Unknown");
     output += F(" stick");
-    Serial.println(output);
+    printOutput();
     #endif
   }
 }
+
+#endif    // defined(PS3_NAVIGATION)

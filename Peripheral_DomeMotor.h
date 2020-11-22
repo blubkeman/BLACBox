@@ -2,18 +2,25 @@
  *    B.L.A.C.Box: Brian Lubkeman's Astromech Controller
  * =================================================================================
  * Peripheral_Dome_Motor.h - Library for a Syren 10 dome motor controller
- * Created by Brian Lubkeman, 22 October 2020
+ * Created by Brian Lubkeman, 22 November 2020
  * Inspired by S.H.A.D.O.W. controller code written by KnightShade
  * Released into the public domain.
  */
 #ifndef _PERIPHERAL_DOME_MOTOR_H_
 #define _PERIPHERAL_DOME_MOTOR_H_
 
-#include "Globals.h"
+#include "Buffer.h"
 #include <Sabertooth.h>
 
 extern String output;
-extern HardwareSerial &MotorSerial;
+extern void printOutput(void);
+extern HardwareSerial &DomeSerial;
+
+// Dome automation stages
+
+const uint8_t STOPPED = 0;
+const uint8_t PREPARED = 1;
+const uint8_t TURNING = 2;
 
 
 /* ===============================================
@@ -21,19 +28,41 @@ extern HardwareSerial &MotorSerial;
  * ===============================================
  *  PS3 Navigation
  *
- *    Single Controller
- *    -----------------
- *    L2+Cross      = Disable dome automation
- *    L2+Circle     = Enable dome automation
- *    L2+Nav1 Stick = Rotate dome at variable speed and direction
- *    Cross         = Rotate dome CW at the fixed speed
- *    Circle        = Rotate dome CCW at the fixed speed
+ *  Without DEBUG_DRIVEman Switch
+ *  ======================
  *
- *    Dual Controller
- *    ---------------
- *    L2+Cross      = Disable dome automation
- *    L2+Circle     = Enable dome automation
- *    Nav2 Stick    = Rotate dome at variable speed and direction
+ *  Single Controller
+ *  -----------------
+ *  L2+Cross      = Disable dome automation
+ *  L2+Circle     = Enable dome automation
+ *  L2+Nav1 Stick = Rotate dome at variable speed and direction
+ *
+ *  Dual Controller
+ *  ---------------
+ *  L2+Cross      = Disable dome automation
+ *  L2+Circle     = Enable dome automation
+ *  Nav2 Stick    = Rotate dome at variable speed and direction
+ *
+ *  With DEBUG_DRIVEman Switch
+ *  ======================
+ *
+ *  Single Controller
+ *  -----------------
+ *  L1+Cross      = Disable dome automation
+ *  L1+Circle     = Enable dome automation
+ *  L1+Nav1 Stick = Rotate dome at variable speed and direction
+ *    
+ *  Dual Controller
+ *  ---------------
+ *  L1+Cross      = Disable dome automation
+ *  L1+Circle     = Enable dome automation
+ *  Nav2 Stick    = Rotate dome at variable speed and direction
+ *    
+ *  Custom addtion to Single Controller w/ or w/o DEBUG_DRIVEman Switch
+ *  ------------------------------------------------------------
+ *  Cross         = Rotate dome CW at the fixed speed
+ *  Circle        = Rotate dome CCW at the fixed speed
+ *
  * =============================================== */
 
 
@@ -50,6 +79,7 @@ class Dome_Motor
 
   // For use by attachInterrupt
     static Dome_Motor * Dome_Motor::anchor;
+    void stop(void);
     static void domeISR(void);
 
   private:
@@ -60,7 +90,7 @@ class Dome_Motor
     float _targetPosition;
     unsigned long _stopTurnTime;
     unsigned long _startTurnTime;
-    unsigned long _previousMillis;
+    unsigned long _previousTime;
     int _rotationStatus;
 
     void _nextCycle(void);
