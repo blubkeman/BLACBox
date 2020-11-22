@@ -2,7 +2,7 @@
  *    B.L.A.C.Box: Brian Lubkeman's Astromech Controller
  * =================================================================================
  * Peripheral_Marcduino.cpp - Library for the Marcduino system
- * Created by Brian Lubkeman, 22 October 2020
+ * Created by Brian Lubkeman, 22 November 2020
  * Inspired by S.H.A.D.O.W. controller code written by KnightShade
  * Released into the public domain.
  */
@@ -10,13 +10,14 @@
 #include "Peripheral_Marcduino.h"
 #include "Settings_MD_Commands.h"
 
+#if defined(MARCDUINO)
+
 // =====================
 //      Constructor
 // =====================
 Marcduino::Marcduino(Buffer* pBuffer)
 {
   _buffer = pBuffer;
-  _buffer->setDomeCustomPanelRunning(false);
 
   #if defined(DEBUG_MARCDUINO) || defined (DEBUG_ALL)
   _className = F("Marcduino::");
@@ -28,21 +29,21 @@ Marcduino::Marcduino(Buffer* pBuffer)
 // ================
 void Marcduino::begin()
 {
-  #if defined(DEBUG_MARCDUINO) || defined (DEBUG_ALL)
+  #if defined(DEBUG_MARCDUINO) || defined(DEBUG_ALL)
   output = _className+F("begin()");
   output += F(" - Marcduino system started.");
     output += F("\r\n Dome");
-    #ifdef MD_BODY_MASTER
-    output += F(" and body"); 
+      #ifdef MD_BODY_MASTER
+      output += F(" and body");
+      #endif
     output += F(" master defined.");
     output += F("\r\n  Sound to ");
-      #ifndef MD_BODY_SOUND
-      output += F("dome master.");
-      #else
+      #if defined(MD_BODY_MASTER) && defined(BODY_SOUND)
       output += F("body master.");
+      #else
+      output += F("dome master.");
       #endif
-    #endif
-  Serial.println(output);
+  if (Serial) { Serial.println(output); }
   #endif
 }
 
@@ -53,12 +54,12 @@ void Marcduino::interpretController()
 {
   // Enter quiet mode if we lose the controllers.
 
-  if ( ! _buffer->isPrimaryConnected() && ! _buffer->isSecondaryConnected() ) {
+  if ( ! _buffer->isControllerConnected() ) {
 
     #if defined(DEBUG_MARCDUINO) || defined (DEBUG_ALL)
     output = _className+F("interpretController()");
     output += F(" - No controller. Quiet mode.");
-    Serial.println(output);
+    if (Serial) { Serial.println(output); }
     #endif
 
     _quietMode();
@@ -84,7 +85,6 @@ void Marcduino::automation()
 {
   // Holoprojector automation
 
-  #ifdef HOLOPROJECTORS
   if (_buffer->isHoloAutomationRunning()) {
     unsigned long currentTime;
     for (int holoNumber = 0; holoNumber < NUMBER_OF_HOLOPROJECTORS; holoNumber++) {
@@ -101,11 +101,10 @@ void Marcduino::automation()
       if (currentTime > (_lastRandomTime[holoNumber] + _randomSeconds[holoNumber])) {
         _lastRandomTime[holoNumber] = currentTime;
         _randomSeconds[holoNumber] = 0;
-        _sendCommand(_getPgmString(cmd_HPRandomOn));
+        _sendCommand(getPgmString(cmd_HPRandomOn), MD_DomeSerial);
       }
     }
   }
-  #endif
 }
 
 // ==============================
@@ -124,7 +123,7 @@ void Marcduino::runCustomPanelSequence()
   #if defined(DEBUG_MARCDUINO) || defined (DEBUG_ALL)
   output = _className+F("runCustomPanelSequence()");
   output += F(" - Running custom routine");
-  Serial.println(output);
+  if (Serial) { Serial.println(output); }
   #endif
 
   // Initialize local variables.
@@ -148,13 +147,13 @@ void Marcduino::runCustomPanelSequence()
     if (_panelState[i].Status == 1) {
       if ((_panelState[i].Start + (_panelState[i].Start_Delay * 1000)) < millis()) {
         cmd = ":OP"+xx+"\r";
-        _sendCommand(cmd, DomeSerial);
+        _sendCommand(cmd, MD_DomeSerial);
         _panelState[i].Status = 2;
 
         #if defined(DEBUG_MARCDUINO) || defined (DEBUG_ALL)
         output = F("  Opening panel #");
         output += i+1;
-        Serial.println(output);
+        if (Serial) { Serial.println(output); }
         #endif
       }
     }
@@ -164,13 +163,13 @@ void Marcduino::runCustomPanelSequence()
     if (_panelState[i].Status == 2) {
       if ((_panelState[i].Start + ((_panelState[i].Start_Delay + _panelState[i].Open_Time) * 1000)) < millis()) {
         cmd = ":CL"+xx+"\r";
-        _sendCommand(cmd, DomeSerial);
+        _sendCommand(cmd, MD_DomeSerial);
         _panelState[i].Status = 0;
 
         #if defined(DEBUG_MARCDUINO) || defined (DEBUG_ALL)
         output = F("  Closing panel #");
         output += i+1;
-        Serial.println(output);
+        if (Serial) { Serial.println(output); }
         #endif
       }
     }
@@ -184,6 +183,73 @@ void Marcduino::runCustomPanelSequence()
      _buffer->setDomeCustomPanelRunning(false);
   }
 }
+
+// ========================
+//      _sendCommand()
+// ========================
+void Marcduino::_sendCommand(uint8_t btnIdx)
+{
+  String pgmString;
+
+  // Lookup the dome command.
+  // When found, send it to the dome master.
+  // When not found, do nothing.
+
+  pgmString = getPgmString(domeCommands[btnIdx]);
+  if (pgmString != "") {
+    _sendCommand(pgmString, MD_DomeSerial);
+
+    #if defined(DEBUG_MARCDUINO) || defined(DEBUG_ALL)
+    output = _className+F("_sendCommand()");
+    output += F(" - Send ");
+    output += pgmString;
+    output += F(" to dome master.");
+    if (Serial) { Serial.println(output); }
+    #endif
+  }
+
+  // Lookup the body command.
+  // When found, send it to the body master.
+  // When not found, do nothing.
+
+  #ifdef MD_BODY_MASTER
+  pgmString = getPgmString(bodyCommands[btnIdx]);
+  if (pgmString != "") {
+    _sendCommand(pgmString, MD_BodySerial);
+
+    #if defined(DEBUG_MARCDUINO) || defined(DEBUG_ALL)
+    output = _className+F("_sendCommand()");
+    output += F(" - Send ");
+    output += pgmString;
+    output += F(" to body master.");
+    if (Serial) { Serial.println(output); }
+    #endif
+  }
+  #endif
+};
+
+void Marcduino::_sendCommand(String inStr, HardwareSerial targetSerial)
+{
+  // This function allows for the use of either a slip ring (wired)
+  //  or a Feather Radio (wireless) connection to the dome.
+
+  #ifndef FEATHER_RADIO
+
+  targetSerial.print(inStr);
+
+  #else
+
+  if (targetSerial == MD_BodySerial) {
+    targetSerial.print(inStr);
+  } else {
+    // Send one character at a time to the Feather Radio.
+    for (int i=0; i<inStr.length(); i++) {
+      targetSerial.write(inStr[i]);
+    }
+  }
+
+  #endif
+};
 
 // =====================================
 //      _getButtonIndex()
@@ -208,7 +274,7 @@ int8_t Marcduino::_getButtonIndex()
 
   // Next, check for modifier buttons.
   // L2 and R2 are not evaluated here. They are
-  //  evaluated in the dome and foot motor code.
+  //  evaluated in the dome and drive motor code.
 
   if (out > -1) {
     if (_buffer->getButton(SELECT))     { out += 4; }
@@ -224,7 +290,7 @@ int8_t Marcduino::_getButtonIndex()
     output = _className+F("_getStandardFunctionIndex()");
     output += F(" - sfIndex: ");
     output += out;
-    Serial.println(output);
+    if (Serial) { Serial.println(output); }
   }
   #endif
 
@@ -233,92 +299,16 @@ int8_t Marcduino::_getButtonIndex()
   return out;
 };
 
-// ===========================
-//      _getPgmString()
-// ===========================
-String Marcduino::_getPgmString(const char * inValue)
-{
-  // This function takes in a pointer to a char array that has been
-  // stored in program memory and returns its string content.
-
-  String pgmOutput = "";
-  for (byte k = 0; k < strlen_P(inValue); k++) {
-    pgmOutput += (char)pgm_read_byte_near(inValue + k);
-  }
-  return pgmOutput;
-}
-
-String Marcduino::_getPgmString(const char inValue)
-{
-  // This function takes in a char array that has been
-  // stored in program memory and returns its string content.
-
-  String pgmOutput = "";
-  for (byte k = 0; k < sizeof(inValue); k++) {
-    pgmOutput += (char)pgm_read_byte_near(inValue + k);
-  }
-  return pgmOutput;
-}
-
-// ========================
-//      _sendCommand()
-// ========================
-void Marcduino::_sendCommand(uint8_t btnIdx)
-{
-  String pgmString;
-
-  // Lookup the dome command.
-  // When found, send it to the dome master.
-  // When not found, do nothing.
-
-  pgmString = _getPgmString(domeCommands[btnIdx]);
-  if (pgmString != "") {
-    _sendCommand(pgmString, DomeSerial);
-  }
-
-  // Lookup the body command.
-  // When found, send it to the body master.
-  // When not found, do nothing.
-
-  pgmString = _getPgmString(bodyCommands[btnIdx]);
-  if (pgmString != "") {
-    _sendCommand(pgmString, BodySerial);
-  }
-};
-
-void Marcduino::_sendCommand(String inStr, HardwareSerial targetSerial)
-{
-  // This function allows for the use of either a slip ring (wired)
-  //  or a Feather Radio (wireless) connection to the dome.
-
-  #ifndef FEATHER_RADIO
-
-  targetSerial.print(inStr);
-
-  #else
-
-  if (targetSerial == BodySerial) {
-    targetSerial.print(inStr);
-  } else {
-    // Send one character at a time to the Feather Radio.
-    for (int i=0; i<inStr.length(); i++) {
-      targetSerial.write(inStr[i]);
-    }
-  }
-
-  #endif
-};
-
 // ======================
 //      _quietMode()
 // ======================
 void Marcduino::_quietMode()
 {
-  #ifdef MD_BODY_SOUND
-  _sendCommand(_getPgmString(cmd_DomeQuiet), DomeSerial);
-  _sendCommand(_getPgmString(cmd_BodyQuiet), BodySerial);
+  #if defined(MD_BODY_MASTER) && defined(BODY_SOUND)
+  _sendCommand(getPgmString(cmd_DomeQuiet), MD_DomeSerial);
+  _sendCommand(getPgmString(cmd_BodyQuiet), MD_BodySerial);
   #else
-  _sendCommand(_getPgmString(cmd_QuietMode), DomeSerial);
+  _sendCommand(getPgmString(cmd_QuietMode), MD_DomeSerial);
   #endif
 }
 
@@ -348,17 +338,18 @@ uint8_t Marcduino::_setPanelState(uint8_t idx)
   #if defined(DEBUG_MARCDUINO) || defined (DEBUG_ALL)
   if (statusTotal > 0) {
     output = _className+F("_setPanelState()");
-    Serial.println(output);
+    if (Serial) { Serial.println(output); }
     for (uint8_t i = 0; i < NUMBER_OF_DOME_PANELS; i++) {
       output = F(" - Panel #"); output += i+1;
       output += F(" Status: "); output += _panelState[i].Status;
       output += F(" Start: "); output += _panelState[i].Start;
       output += F(" Delay: "); output += _panelState[i].Start_Delay;
       output += F(" Open: "); output += _panelState[i].Open_Time;
-      Serial.println(output);
+      if (Serial) { Serial.println(output); }
     }
   }
   #endif
 
   return statusTotal;
 }
+#endif

@@ -2,20 +2,28 @@
  *    B.L.A.C.Box: Brian Lubkeman's Astromech Controller
  * =================================================================================
  * Peripheral_Marcduino.h - Library for the Marcduino system
- * Created by Brian Lubkeman, 22 October 2020
+ * Created by Brian Lubkeman, 22 November 2020
  * Inspired by S.H.A.D.O.W. controller code written by KnightShade
  * Released into the public domain.
  */
 #ifndef _PERIPHERAL_MARCDUINO_H_
 #define _PERIPHERAL_MARCDUINO_H_
 
-#include "Globals.h"
+#include "Buffer.h"
 #include <avr/pgmspace.h>
 
 extern String output;
-extern HardwareSerial &MotorSerial;
+extern void printOutput(void);
+extern String getPgmString(const char *); // Used with command arrays.
+extern String getPgmString(const char);   // Used with cmd_xx constants.
 extern HardwareSerial &DomeSerial;
-extern HardwareSerial &BodySerial;
+
+#ifdef MARCDUINO
+extern HardwareSerial &MD_DomeSerial;
+#ifdef MD_BODY_MASTER
+extern HardwareSerial &MD_BodySerial;
+#endif
+#endif
 
 
 /* ==========================================
@@ -42,17 +50,16 @@ class Marcduino {
 
   public:
     Marcduino(Buffer * pBuffer);
-    void begin();
-    void interpretController();
-    void automation();
-    void runCustomPanelSequence();
+    void begin(void);
+    void interpretController(void);
+    void automation(void);
+    void runCustomPanelSequence(void);
+    bool exists(void) { return true; };
 
   private:
     Buffer * _buffer;
 
     int8_t _getButtonIndex();
-    String _getPgmString(const char *); // Used with command arrays.
-    String _getPgmString(const char);   // Used with cmd_xx constants.
     void _sendCommand(uint8_t);         // Used with command arrays
     void _sendCommand(String, HardwareSerial); // Send a string to a given Serial
     void _quietMode();

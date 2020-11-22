@@ -2,7 +2,7 @@
  *    B.L.A.C.Box: Brian Lubkeman's Astromech Controller
  * =================================================================================
  * Buffer.h - Library for controller inputs
- * Created by Brian Lubkeman, 22 October 2020
+ * Created by Brian Lubkeman, 22 November 2020
  * Inspired by S.H.A.D.O.W. controller code written by KnightShade
  * Released into the public domain.
  */
@@ -10,10 +10,18 @@
 #ifndef _BUFFER_H_
 #define _BUFFER_H_
 
-#include "Globals.h"
-extern String output;
-
+#include "Settings.h"
 #include <controllerEnums.h>  // This is part of the USB_Host_Shield_Library_2.0
+
+extern String output;
+extern void printOutput(void);
+
+// Connected controller types
+
+const uint8_t NONE = 0;   // This represents no connected controllers.
+const uint8_t HALF = 1;   // This represents a single PS3 Move Navigation controller connected.
+const uint8_t FULL = 2;   // This represents either a single-device controller or dual PS3 Move Navigation controllers connected.
+
 #define PS2 19  // Adding the PS button on a second Navigation to the array of controller buttons
 
 /* From the USB Host Shield library,                       |
@@ -28,10 +36,10 @@ extern String output;
  * 5  = START     OPTIONS   PLUS      PLUS                 |  START     START    (= CIRCLE of Nav1 or Nav2)
  * 6  = L3        L3        TWO       TWO                  |  L3
  * 7  = R3        R3        ONE       ONE                  |            R3       (= Nav2 L3)
- * 8  = L2        L2        MINUS     MINUS      BLACK     |  L2        L2       (= L2 of Nav1 or Nav2)
- * 9  = R2        R2        HOME      HOME       WHITE     |
- * 10 = L1        L1        Z         Z                    |  L1        L1       (= L1 of Nav1 or Nav2)
- * 11 = R1        R1        C         C                    |
+ * 8  = L2        L2        MINUS     MINUS      BLACK     |  L2
+ * 9  = R2        R2        HOME      HOME       WHITE     |            R2       (= Nav2 L2)
+ * 10 = L1        L1        Z         Z                    |  L1
+ * 11 = R1        R1        C         C                    |            R1       (= Nav2 L1)
  * 12 = TRIANGLE  TRIANGLE  B         B                    |            TRIANGLE (= Nav2 UP)
  * 13 = CIRCLE    CIRCLE    A         A                    |            CIRCLE   (= Nav2 RIGHT)
  * 14 = CROSS     CROSS                          X         |            CROSS    (= Nav2 DOWN)
@@ -66,95 +74,88 @@ class Buffer
     Buffer(void);
     void begin(void);
 
-  // ==============================================
-  //           Controller input functions
-  // ==============================================
-    void setButton(uint8_t, int);
-    void setStick(uint8_t, int);
-    void setPrevStick(uint8_t, int);
+    char * buttonLabel[20];
 
+  // Controller input functions
+    void resetButtons(void);
+    void updateButton(uint8_t, int);
     uint8_t getButton(uint8_t);
-    uint8_t getStick(uint8_t);
-    uint8_t getPrevStick(uint8_t);
+    void setButton(uint8_t, int);
 
+    void setStick(uint8_t, int);
+    uint8_t getStick(uint8_t);
+    void setPrevStick(uint8_t, int);
+    uint8_t getPrevStick(uint8_t);
     void saveStick(void);
     void restoreStick(uint8_t);
 
     bool isStickOffCenter(uint8_t);
-    bool isButtonModified(void);
 
-  // ===================================
-  //          Status functions
-  // ===================================
-    void setPrimaryConnected(bool);
-    void setSecondaryConnected(bool);
-    void setFootEnabled(bool);
-    void setFootStopped(bool);
-    void setDomeEnabled(bool);
+  // Controller status
+    void setControllerConnected(uint8_t);   // Pass 0=NONE, 1=HALF (PS3Nav only), 2=FULL
+
+    bool isFullControllerConnected(void);   // Returns true when _controllerConnected == FULL
+    bool isHalfControllerConnected(void);   // Returns true when _controllerConnected == HALF
+    bool isControllerConnected(void);       // Returns true when _controllerConnected == HALF or FULL (not NONE)
+
+  // Controller output
+    void _setRumbledRequested(bool b);
+    bool _getRumbledRequested(void);
+
+  // Peripheral status
+    void setDriveEnabled(bool);
+    void setDriveStopped(bool);
     void setDomeStopped(bool);
     void setDomeAutomationRunning(bool);
     void setDomeCustomPanelRunning(bool);
     void setHoloAutomationRunning(bool);
 
-    bool isPrimaryConnected(void);
-    bool isSecondaryConnected(void);
-    bool isFootEnabled(void);
-    bool isFootStopped(void);
-    bool isDomeEnabled(void);
+    bool isDriveEnabled(void);
+    bool isDriveStopped(void);
+    bool isOverdriveEnabled(void);
     bool isDomeStopped(void);
     bool isDomeAutomationRunning(void);
     bool isDomeCustomPanelRunning(void);
     bool isHoloAutomationRunning(void);
-
-  // =======================================
-  //          Stop motor functions
-  // =======================================
+    bool isBodyPanelRunning(void);
+    
+  //  Motor functions
     void stopDomeMotor(void);
-    void stopFootMotor(void);
 
+  // Testing inputs
     #ifdef TEST_CONTROLLER
-  // ===================================
-  //          Testing functions
-  // ===================================
-    void testInput(void);
+    void displayInput(void);
     void scrollInput(void);
     #endif
 
   private:
     InputData_Struct _input;    // Controller inputs
 
-  // ===============================
-  //          Status flags
-  // ===============================
-    bool _primaryConnected;
-    bool _secondaryConnected;
-    bool _footEnabled;
-    bool _footStopped;
-    bool _domeEnabled;
+  // Status flags
+    uint8_t _controllerConnected;   // 0=NONE, 1=HALF, 2=FULL
+    bool _driveEnabled;
+    bool _driveStopped;
+    bool _overdriveEnabled;
     bool _domeStopped;
     bool _domeAutomationRunning;
     bool _domeCustomPanelRunning;
     bool _holoAutomationRunning;
+    bool _bodyPanelRunning;
+    bool _rumbledRequested;
 
-  // ===================================
-  //          Stop motor flags
-  // ===================================
+  // Motor controls
     bool _stopDomeMotor;
-    bool _stopFootMotor;
-
-    #ifdef TEST_CONTROLLER
-  // ===================================
-  //          Testing functions
-  // ===================================
-    void _displayStick(String stick);
-    void _displayButton(String dPadButton);
-    #endif
 
     #if defined(DEBUG_BUFFER) || defined(DEBUG_ALL) || defined(TEST_CONTROLLER)
-  // ============================
-  //          Debugging
-  // ============================
+
+  // Debugging
     String _className;
+    #endif
+
+  // Testing inputs
+    #ifdef TEST_CONTROLLER
+    void _displayButtons(uint8_t, uint8_t);
+    void _displayStick(String, uint8_t, uint8_t);
     #endif
 };
 #endif
