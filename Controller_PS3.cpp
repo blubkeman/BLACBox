@@ -15,7 +15,7 @@
  *           Authorized MAC Addresses
  * ============================================ */
 char * PS3_MAC_ADDRESSES[NUMBER_OF_MAC_ADDRESSES] = {
-  "38:C0:96:DD:15:DD"
+  "xx:xx:xx:xx:xx:xx"
 };
 
 
