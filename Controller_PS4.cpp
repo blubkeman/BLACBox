@@ -15,7 +15,7 @@
  *           Authorized MAC Addresses
  * ============================================ */
 char * PS4_MAC_ADDRESSES[NUMBER_OF_MAC_ADDRESSES] = {
-  "4C:B9:9B:21:63:3E"
+  "xx:xx:xx:xx:xx:xx"
 };
 
 
