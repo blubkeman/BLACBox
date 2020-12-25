@@ -2,7 +2,7 @@
  *    B.L.A.C.Box: Brian Lubkeman's Astromech Controller
  * =================================================================================
  * Buffer.h - Library for controller inputs
- * Created by Brian Lubkeman, 22 November 2020
+ * Created by Brian Lubkeman, 17 December 2020
  * Inspired by S.H.A.D.O.W. controller code written by KnightShade
  * Released into the public domain.
  */
@@ -99,8 +99,8 @@ class Buffer
     bool isControllerConnected(void);       // Returns true when _controllerConnected == HALF or FULL (not NONE)
 
   // Controller output
-    void _setRumbledRequested(bool b);
-    bool _getRumbledRequested(void);
+    void requestLedUpdate(bool);
+    bool isLedUpdateRequested(void);
 
   // Peripheral status
     void setDriveEnabled(bool);
@@ -109,6 +109,7 @@ class Buffer
     void setDomeAutomationRunning(bool);
     void setDomeCustomPanelRunning(bool);
     void setHoloAutomationRunning(bool);
+    void setSpeedProfile(uint8_t);
 
     bool isDriveEnabled(void);
     bool isDriveStopped(void);
@@ -118,7 +119,8 @@ class Buffer
     bool isDomeCustomPanelRunning(void);
     bool isHoloAutomationRunning(void);
     bool isBodyPanelRunning(void);
-    
+    uint8_t getSpeedProfile(void);
+
   //  Motor functions
     void stopDomeMotor(void);
 
@@ -134,14 +136,15 @@ class Buffer
   // Status flags
     uint8_t _controllerConnected;   // 0=NONE, 1=HALF, 2=FULL
     bool _driveEnabled;
-    bool _driveStopped;
+    volatile bool _driveStopped;
     bool _overdriveEnabled;
-    bool _domeStopped;
+    volatile bool _domeStopped;
     bool _domeAutomationRunning;
     bool _domeCustomPanelRunning;
     bool _holoAutomationRunning;
     bool _bodyPanelRunning;
-    bool _rumbledRequested;
+    bool _updateRequested;
+    uint8_t _speedProfile;
 
   // Motor controls
     bool _stopDomeMotor;

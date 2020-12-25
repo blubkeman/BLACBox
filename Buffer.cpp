@@ -2,13 +2,16 @@
  *    B.L.A.C.Box: Brian Lubkeman's Astromech Controller
  * =================================================================================
  * Buffer.cpp - Library for controller inputs for the B.L.A.C.Box system
- * Created by Brian Lubkeman, 22 November 2020
+ * Created by Brian Lubkeman, 17 December 2020
  * Inspired by S.H.A.D.O.W. controller code written by KnightShade
  * Released into the public domain.
  */
 
 #include "Arduino.h"
 #include "Buffer.h"
+
+extern volatile bool domeStopped;
+extern volatile bool driveStopped;
 
 
 // =====================
@@ -34,7 +37,8 @@ Buffer::Buffer(void)
   _domeAutomationRunning = false;
   _domeCustomPanelRunning = false;
   _holoAutomationRunning = false;
-  _rumbledRequested = false;
+  _speedProfile = 0;
+  _updateRequested = false;
 
   // ---------------------
   // Prepare for debugging
@@ -71,6 +75,7 @@ void Buffer::begin(void)
   #endif
 }
 
+
 // ==============================================
 //           Controller input functions
 // ==============================================
@@ -101,8 +106,9 @@ void Buffer::restoreStick(uint8_t i)
 
 bool Buffer::isStickOffCenter(uint8_t i)
 {
-  return ( abs(getStick(i) - JOYSTICK_CENTER) >= JOYSTICK_DEBUG_DRIVE_ZONE );
+  return ( abs(getStick(i) - JOYSTICK_CENTER) >= JOYSTICK_DEAD_ZONE );
 }
+
 
 // ===============================================
 //           Controller status functions
@@ -113,21 +119,33 @@ bool Buffer::isFullControllerConnected(void) { return (_controllerConnected == 2
 bool Buffer::isHalfControllerConnected(void) { return (_controllerConnected == 1 ? true : false); };
 bool Buffer::isControllerConnected(void)     { return (_controllerConnected > 0  ? true : false); };
 
+
 // ===============================================
 //           Controller output functions
 // ===============================================
-void Buffer::_setRumbledRequested(bool b) { _rumbledRequested = b; };
-bool Buffer::_getRumbledRequested(void) { return _rumbledRequested; };
+void Buffer::requestLedUpdate(bool b) { _updateRequested = b; };
+bool Buffer::isLedUpdateRequested(void) { return _updateRequested; };
+
 
 // ================================================
 //           Perpipheral status functions
 // ================================================
-void Buffer::setDriveEnabled(bool b)           { _driveEnabled = b; };
-void Buffer::setDriveStopped(bool b)           { _driveStopped = b; };
-void Buffer::setDomeStopped(bool b)            { _domeStopped = b; };
-void Buffer::setDomeAutomationRunning(bool b)  { _domeAutomationRunning = b; };
-void Buffer::setDomeCustomPanelRunning(bool b) { _domeCustomPanelRunning = b; };
-void Buffer::setHoloAutomationRunning(bool b)  { _holoAutomationRunning = b; };
+void Buffer::setDriveEnabled(bool b) 
+{
+  _driveEnabled = b;
+  requestLedUpdate(true);
+}
+void Buffer::setDriveStopped(bool b)           { _driveStopped = b; }
+void Buffer::setDomeStopped(bool b)            { _domeStopped = b; }
+void Buffer::setDomeAutomationRunning(bool b)  { _domeAutomationRunning = b; }
+void Buffer::setDomeCustomPanelRunning(bool b) { _domeCustomPanelRunning = b; }
+void Buffer::setHoloAutomationRunning(bool b)  { _holoAutomationRunning = b; }
+
+void Buffer::setSpeedProfile(uint8_t i)
+{
+  _speedProfile = i;
+  analogWrite(SCRIPT_PIN, i*50);
+}
 
 bool Buffer::isDriveEnabled(void)
 {
@@ -136,25 +154,26 @@ bool Buffer::isDriveEnabled(void)
   // When we have only one PS3Nav controller, L2+Stick
   // rotates the dome. Drive is temporarily disabled.
   // -------------------------------------------------
-  if ( ! isFullControllerConnected() && getButton(L2) )
+  if ( isHalfControllerConnected() && getButton(L2) )
     return false;
   #endif
 
   return _driveEnabled;
-};
-bool Buffer::isDriveStopped(void)           { return _driveStopped; };
-bool Buffer::isOverdriveEnabled(void)       { return _overdriveEnabled; };
-bool Buffer::isDomeStopped(void)            { return _domeStopped; };
-bool Buffer::isDomeAutomationRunning(void)  { return _domeAutomationRunning; };
-bool Buffer::isDomeCustomPanelRunning(void) { return _domeCustomPanelRunning; };
-bool Buffer::isHoloAutomationRunning(void)  { return _holoAutomationRunning; };
-bool Buffer::isBodyPanelRunning(void)       { return _bodyPanelRunning; };
+}
+bool Buffer::isDriveStopped(void)           { return _driveStopped; }
+bool Buffer::isOverdriveEnabled(void)       { return _overdriveEnabled; }
+bool Buffer::isDomeStopped(void)            { return _domeStopped; }
+bool Buffer::isDomeAutomationRunning(void)  { return _domeAutomationRunning; }
+bool Buffer::isDomeCustomPanelRunning(void) { return _domeCustomPanelRunning; }
+bool Buffer::isHoloAutomationRunning(void)  { return _holoAutomationRunning; }
+bool Buffer::isBodyPanelRunning(void)       { return _bodyPanelRunning; }
+uint8_t Buffer::getSpeedProfile(void)       { return _speedProfile; }
 
 
 // ===========================================
 //           Motor control functions
 // ===========================================
-void Buffer::stopDomeMotor(void) { digitalWrite(DOME_INTERRUPT_PIN, LOW); }
+void Buffer::stopDomeMotor(void) {  }
 
 
 #ifdef TEST_CONTROLLER
@@ -212,19 +231,22 @@ void Buffer::_displayButtons(uint8_t iStart, uint8_t iEnd)
 // =========================
 void Buffer::_displayStick(String s, uint8_t x, uint8_t y)
 {
-  uint8_t centerPlus = (JOYSTICK_CENTER + JOYSTICK_DEBUG_DRIVE_ZONE);
-  uint8_t centerMinus = (JOYSTICK_CENTER - JOYSTICK_DEBUG_DRIVE_ZONE);
+  uint8_t centerPlus = (JOYSTICK_CENTER + JOYSTICK_DEAD_ZONE);
+  uint8_t centerMinus = (JOYSTICK_CENTER - JOYSTICK_DEAD_ZONE);
 
   if ( (x < centerMinus || x > centerPlus || y < centerMinus || y > centerPlus) ) {
 
     if ( output != "" ) { output += " + "; }
-    output += s; output += F(": ");
-    output += x; output += F(","); output += y;
+    output += s;
+    output += F(": ");
+    output += x;
+    output += F(",");
+    output += y;
 
     // This will show the pressed state of L2, R2, L1 and R1.
   
     for (uint8_t i = L2; i <= R1 ; i++) {
-      if (getButton(i) > 0) {
+      if ( getButton(i) > 0 ) {
         output += " + ";
         output += buttonLabel[i];
       }
@@ -237,7 +259,7 @@ void Buffer::_displayStick(String s, uint8_t x, uint8_t y)
 // =======================
 void Buffer::scrollInput(void)
 {
-  //Nav1 - Up:x Rt:x Dn:x Lt:x L3:x L2:x L1:x PS:x | Nav2 - Up:x Rt:x Dn:x Lt:x R3:x PS:x
+  //LX:x LY:x Up:x Rt:x Dn:x Lt:x L3:x L2:x L1:x PS:x [X:x O:x | Sl:x St:x] [RX:x RY:x Tr:x Ci:x Cr:x Sq:x R3:x R2:x R1:]
 
   output = "";
   
@@ -256,7 +278,7 @@ void Buffer::scrollInput(void)
     #if defined(PS3_NAVIGATION)
     output += " X:";   output += getButton(SELECT);
     output += " O:";   output += getButton(START);
-    #elif defined(PS3_CONTROLLER)
+    #else
     output += " Sl:";   output += getButton(SELECT);
     output += " St:";   output += getButton(START);
     #endif

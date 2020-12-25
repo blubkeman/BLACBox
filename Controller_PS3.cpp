@@ -2,12 +2,12 @@
  *    B.L.A.C.Box: Brian Lubkeman's Astromech Controller
  * =================================================================================
  * Controller_PS3.cpp - Library for the subclass for the PS3 Move Navigation controller
- * Created by Brian Lubkeman, 22 November 2020
+ * Created by Brian Lubkeman, 17 December 2020
  * Inspired by S.H.A.D.O.W. controller code written by KnightShade
  * Released into the public domain.
  */
 #include "Arduino.h"
-#include "Controller_PS3.h"
+#include "Controllers.h"
 
 #if defined(PS3_CONTROLLER)
 
@@ -15,7 +15,7 @@
  *           Authorized MAC Addresses
  * ============================================ */
 char * PS3_MAC_ADDRESSES[NUMBER_OF_MAC_ADDRESSES] = {
-  "00:06:F7:B8:57:01"
+  "38:C0:96:DD:15:DD"
 };
 
 
@@ -26,6 +26,7 @@ char * PS3_MAC_ADDRESSES[NUMBER_OF_MAC_ADDRESSES] = {
 // =====================
 //      Constructor
 // =====================
+
 Controller_PS3::Controller_PS3(Buffer * pBuffer) : Controller_Parent(pBuffer), _controller(&_Btd)
 {
   _buffer->buttonLabel[0] = "Up";
@@ -45,11 +46,13 @@ Controller_PS3::Controller_PS3(Buffer * pBuffer) : Controller_Parent(pBuffer), _
   _buffer->buttonLabel[14] = "Down";
   _buffer->buttonLabel[15] = "Left";
   _buffer->buttonLabel[16] = "PS";
-  _buffer->buttonLabel[17] = "Move";
-  _buffer->buttonLabel[4] = "T";
+  _buffer->buttonLabel[17] = "";
+  _buffer->buttonLabel[4] = "";
   _buffer->buttonLabel[19] = "";
 
-  // Debugging
+  // ----------
+  // Debugging.
+  // ----------
 
   #if defined(DEBUG_CONTROLLER) || defined(DEBUG_ALL)
   _className = F("Controller_PS3::");
@@ -66,7 +69,7 @@ void Controller_PS3::begin(void)
   // -------------------
 
   Controller_Parent::begin();
-
+  
   // ---------------------------
   // Setup for the attachOnInit.
   // ---------------------------
@@ -86,7 +89,6 @@ void Controller_PS3::begin(void)
 // ================
 bool Controller_PS3::read()
 {
-
   // --------------------------------------------------------------------
   // The main program will handle stopping the motors if this read fails.
   //
@@ -103,15 +105,6 @@ bool Controller_PS3::read()
 
   _Usb.Task();
   if ( ! _controller.PS3Connected ) {
-
-    // When using the deadman switch, if it was active when we lost the
-    // controller, make certain the deadman switch is turned off.
-
-    #if defined(DEADMAN)
-    if ( digitalRead(DEADMAN_PIN) == HIGH )
-      digitalWrite(DEADMAN_PIN, LOW);
-    #endif
-
     if ( ! _faultData.reconnect )
       _faultData.reconnect = true;
     return false;
@@ -122,9 +115,9 @@ bool Controller_PS3::read()
     }
   }
 
-  // --------------------------------------------------
-  // If we get this far then ours controllers are good.
-  // --------------------------------------------------
+  // -----------------------------------------------
+  // If we get this far then our controller is good.
+  // -----------------------------------------------
 
   // ------------------------------
   // Take a snapshot of the inputs.
@@ -148,13 +141,36 @@ bool Controller_PS3::read()
     return false;
   }
 
+  // -----------------------------------------------------
+  // See if we need to update the LED for a speed profile.
+  // -----------------------------------------------------
+
+  if ( _buffer->isLedUpdateRequested() ) {
+
+    // -----------
+    // Update LED.
+    // -----------
+
+    if ( _buffer->isDriveEnabled() ) {
+      switch ( _buffer->getSpeedProfile() ) {  
+        case 1 : { _controller.setLedOn(LED1); }
+        case 2 : { _controller.setLedOn(LED2); }
+        case 3 : { _controller.setLedOn(LED3); }
+        case 4 : { _controller.setLedOn(LED4); }
+      }
+    }
+  }
+
   // -------------
   // Read is done.
   // -------------
 
+  if ( _buffer->isLedUpdateRequested() ) {
+    _setLed();
+  }
+
   return true;
 }
-
 
 /* =========================================
  *          attachOnInit functions
@@ -226,6 +242,7 @@ void Controller_PS3::_connect(PS3BT * pController)
     printOutput();
     #endif
 
+    _controller.setLedOff();
     _controller.disconnect();
     return;
   }
@@ -249,27 +266,30 @@ void Controller_PS3::_connect(PS3BT * pController)
     printOutput();
     #endif
 
+    _controller.setLedOff();
     _controller.disconnect();
     return;
   }
 
   #if defined(DEBUG_CONTROLLER) || defined(DEBUG_ALL)
-  else {
+  else
     output = _className+F("_connect()");
     output += F(" - Controller authorized.");
     printOutput();
-  }
   #endif
 
   // --------------------
   // Complete connection.
   // --------------------
 
-  _buffer->setControllerConnected(HALF);
+  _buffer->setControllerConnected(FULL);
   _initCriticalFault();
-  _controller.setLedOn(LED1);
+  _buffer->setSpeedProfile(Walk);
+  _buffer->requestLedUpdate(true);
 
-  // Display which controller was connected.
+  // ----------
+  // Debugging.
+  // ----------
 
   #if defined(DEBUG_CONTROLLER) || defined(DEBUG_ALL)
   output = _className+F("_connect()");
@@ -286,7 +306,7 @@ void Controller_PS3::_disconnect(PS3BT * pController)
   _buffer->setControllerConnected(NONE);
   _resetCriticalFault();
 
-  _controller.setLedOff(LED1);
+  _controller.setLedOff();
   _controller.disconnect();
 
   #if defined(DEBUG_CONTROLLER) || defined(DEBUG_ALL)
@@ -294,6 +314,34 @@ void Controller_PS3::_disconnect(PS3BT * pController)
   output += F(" - Controller disconnected");  
   printOutput();
   #endif
+}
+
+// ===================
+//      _setLed()
+// ===================
+void Controller_PS3::_setLed(void)
+{
+  _buffer->requestLedUpdate(false);
+
+  _controller.setLedOff();
+  switch ( _buffer->getSpeedProfile() ) {
+    case 1 : {
+      _controller.setLedOn(LED1);
+      break;
+    }
+    case 2 : {
+      _controller.setLedOn(LED2);
+      break;
+    }
+    case 3 : {
+      _controller.setLedOn(LED3);
+      break;
+    }
+    case 4 : {
+      _controller.setLedOn(LED4);
+      break;
+    }
+  }
 }
 
 /* =====================================================
@@ -322,7 +370,7 @@ void Controller_PS3::_initCriticalFault(void)
 // ================================
 bool Controller_PS3::_detectCriticalFault(void)
 {
-  if ( _controller.PS3NavigationConnected ) {
+  if ( _controller.PS3Connected ) {
     _currentTime = millis();
     _lagTime = 0;
     _faultData.lastMsgTime = _controller.getLastMessageTime();
@@ -371,7 +419,7 @@ bool Controller_PS3::_detectCriticalFault(void)
 
       return true;  // The actual code to stop the motor is in loop() when read() fails.
     }
-  
+
     // --------------------------
     // Check the PS3 signal data.
     // --------------------------
@@ -384,13 +432,17 @@ bool Controller_PS3::_detectCriticalFault(void)
 
       if (_faultData.pluggedStateTime > 0) {
 
+        // ------------------------------------------------------------
         // Has the desired amount of time between failed checks passed?
-        
+        // ------------------------------------------------------------
+
         unsigned long interval = (_buffer->isFullControllerConnected() ? PLUGGED_STATE_LONG_INTERVAL : PLUGGED_STATE_SHORT_INTERVAL);
         if ( _currentTime > ( _faultData.pluggedStateTime + interval )) {
 
+          // -------------------------------------------------------
           // We have our second failed check.
           // Trigger the critical fault and reset the state machine.
+          // -------------------------------------------------------
 
           _faultData.badData++;
           _faultData.pluggedStateTime = 0;
@@ -451,8 +503,8 @@ void Controller_PS3::_resetCriticalFault(void)
   _faultData.reconnect = true;
   _faultData.pluggedStateTime = 0;
 
-  if (_controller.getLastMessageTime() == 0 || ! _controller.PS3NavigationConnected )
-    _faultData.lastMsgTime = -1;
+  if (_controller.getLastMessageTime() == 0 || ! _controller.PS3Connected )
+     _faultData.lastMsgTime = -1;
   else
     _faultData.lastMsgTime = _controller.getLastMessageTime();
 
@@ -467,9 +519,6 @@ void Controller_PS3::_resetCriticalFault(void)
  *          Buffer functions
  * =================================== */
 
-// ======================
-//      _setBuffer()
-// ======================
 void Controller_PS3::_setBuffer(void)
 {
   // ---------------------------------------------------------------
@@ -486,11 +535,14 @@ void Controller_PS3::_setBuffer(void)
   _buffer->setButton(RIGHT,    _controller.getButtonClick(RIGHT));
   _buffer->setButton(DOWN,     _controller.getButtonClick(DOWN));
   _buffer->setButton(LEFT,     _controller.getButtonClick(LEFT));
-  _buffer->setButton(SELECT,   _controller.getButtonPress(SELECT));
-  _buffer->setButton(START,    _controller.getButtonPress(START));
+  _buffer->setButton(SELECT,   _controller.getButtonPress(SHARE));
+  _buffer->setButton(START,    _controller.getButtonPress(OPTIONS));
   _buffer->setButton(L3,       _controller.getButtonClick(L3));
+  _buffer->setButton(R3,       _controller.getButtonClick(R3));
   _buffer->setButton(L2,       _controller.getAnalogButton(L2));
+  _buffer->setButton(R2,       _controller.getAnalogButton(R2));
   _buffer->setButton(L1,       _controller.getButtonPress(L1));
+  _buffer->setButton(R1,       _controller.getButtonPress(R1));
   _buffer->setButton(PS,       _controller.getButtonPress(PS));
   _buffer->setStick(LeftHatX,  _controller.getAnalogHat(LeftHatX));
   _buffer->setStick(LeftHatY,  _controller.getAnalogHat(LeftHatY));
@@ -531,11 +583,14 @@ void Controller_PS3::_updateBuffer(void)
   _buffer->updateButton(RIGHT,    _controller.getButtonClick(RIGHT));
   _buffer->updateButton(DOWN,     _controller.getButtonClick(DOWN));
   _buffer->updateButton(LEFT,     _controller.getButtonClick(LEFT));
-  _buffer->updateButton(SELECT,   _controller.getButtonPress(SELECT));
-  _buffer->updateButton(START,    _controller.getButtonPress(START));
+  _buffer->updateButton(SELECT,   _controller.getButtonPress(SHARE));
+  _buffer->updateButton(START,    _controller.getButtonPress(OPTIONS));
   _buffer->updateButton(L3,       _controller.getButtonClick(L3));
+  _buffer->updateButton(R3,       _controller.getButtonClick(R3));
   _buffer->updateButton(L2,       _controller.getAnalogButton(L2));
+  _buffer->updateButton(R2,       _controller.getAnalogButton(R2));
   _buffer->updateButton(L1,       _controller.getButtonPress(L1));
+  _buffer->updateButton(R1,       _controller.getButtonPress(R1));
   _buffer->updateButton(PS,       _controller.getButtonPress(PS));
   _buffer->setStick(LeftHatX,     _controller.getAnalogHat(LeftHatX));
   _buffer->setStick(LeftHatY,     _controller.getAnalogHat(LeftHatY));
