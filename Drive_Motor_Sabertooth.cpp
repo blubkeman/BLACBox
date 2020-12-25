@@ -6,6 +6,11 @@
  * Inspired by S.H.A.D.O.W. controller code written by KnightShade
  * Released into the public domain.
  */
+
+/* ===================================================================
+ *  This is not ready for use or testing.  Do not expect this to work.
+ * =================================================================== */
+
 #include "Arduino.h"
 #include "Drive_Motors.h"
 
