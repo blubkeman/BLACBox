@@ -2,12 +2,12 @@
  *    B.L.A.C.Box: Brian Lubkeman's Astromech Controller
  * =================================================================================
  * Controller_PS4.cpp - Library for the subclass for the PS4 controller
- * Created by Brian Lubkeman, 22 November 2020
+ * Created by Brian Lubkeman, 17 December 2020
  * Inspired by S.H.A.D.O.W. controller code written by KnightShade
  * Released into the public domain.
  */
 #include "Arduino.h"
-#include "Controller_PS4.h"
+#include "Controllers.h"
 
 #if defined(PS4_CONTROLLER)
 
@@ -15,7 +15,7 @@
  *           Authorized MAC Addresses
  * ============================================ */
 char * PS4_MAC_ADDRESSES[NUMBER_OF_MAC_ADDRESSES] = {
-  "4C:B9:9B:21:63:3E"
+  "xx:xx:xx:xx:xx:xx"
 };
 
 
@@ -52,7 +52,7 @@ Controller_PS4::Controller_PS4(Buffer * pBuffer) : Controller_Parent(pBuffer), _
   _buffer->buttonLabel[15] = "Left";
   _buffer->buttonLabel[16] = "PS";
   _buffer->buttonLabel[17] = "";
-  _buffer->buttonLabel[4] = "Touchpad";
+  _buffer->buttonLabel[18] = "Touchpad";
   _buffer->buttonLabel[19] = "";
 
   // ----------------------------
@@ -136,44 +136,6 @@ bool Controller_PS4::read()
   // If we get this far then our controller is good.
   // -----------------------------------------------
 
-  #if defined(PS3_CONTROLLER) || defined(PS4_CONTROLLER)
-  // ----------------------
-  // Manage rumble actiity.
-  // ----------------------
-
-  if ( _buffer->_getRumbledRequested() ) {
-
-    // -------------
-    // Start rumble.
-    // -------------
-
-    _rumbleStartTime = millis();
-
-    if ( _buffer->isDriveEnabled() ) {
-      _controller.setRumbleOn(RumbleHigh);
-      _controller.setLed(Green);
-    } else {
-      _controller.setRumbleOn(RumbleLow);
-      _controller.setLed(Red);
-    }
-
-    _buffer->_setRumbledRequested(false);
-
-  } else {
-
-    // ------------
-    // Stop rumble.
-    // ------------
-
-    if ( _rumbleStartTime > 0) {
-      if ( (millis() - _rumbleStartTime) >= RUMBLE_DURATION ) {
-        _controller.setRumbleOff();
-        _rumbleStartTime = 0;
-      }
-    }
-  }
-  #endif
-
   // ------------------------------
   // Take a snapshot of the inputs.
   // ------------------------------
@@ -199,6 +161,10 @@ bool Controller_PS4::read()
   // -------------
   // Read is done.
   // -------------
+
+  if ( _buffer->isLedUpdateRequested() ) {
+    _setLed();
+  }
 
   return true;
 }
@@ -315,11 +281,9 @@ void Controller_PS4::_connect(PS4BT * pController)
 
   _buffer->setControllerConnected(FULL);
   _initCriticalFault();
+  _buffer->setSpeedProfile(Walk);
+  _buffer->requestLedUpdate(true);
 
-  #if defined(PS4_CONTROLLER)
-  _buffer->_setRumbledRequested(true);
-  #endif
-  
   // ----------
   // Debugging.
   // ----------
@@ -347,6 +311,37 @@ void Controller_PS4::_disconnect(PS4BT * pController)
   output += F(" - Controller disconnected");  
   printOutput();
   #endif
+}
+
+// ===================
+//      _setLed()
+// ===================
+void Controller_PS4::_setLed(void)
+{
+  _buffer->requestLedUpdate(false);
+
+  if ( ! _buffer->isDriveEnabled() ) {
+    _controller.setLed(Red);
+  } else {
+    switch ( _buffer->getSpeedProfile() ) {
+      case 1 : {
+        _controller.setLed(Yellow);
+        break;
+      }
+      case 2 : {
+        _controller.setLed(Green);
+        break;
+      }
+      case 3 : {
+        _controller.setLed(Blue);
+        break;
+      }
+      case 4 : {
+        _controller.setLed(Purple);
+        break;
+      }
+    }
+  }
 }
 
 /* =====================================================

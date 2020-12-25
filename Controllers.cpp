@@ -1,18 +1,18 @@
 /* =================================================================================
  *    B.L.A.C.Box: Brian Lubkeman's Astromech Controller
  * =================================================================================
- * Controller_All.cpp - Library for parent class of drive motor controllers
- * Created by Brian Lubkeman, 22 November 2020
+ * Controllers.cpp - Library for supported controllers
+ * Created by Brian Lubkeman, 17 December 2020
  * Inspired by S.H.A.D.O.W. controller code written by KnightShade
  * Released into the public domain.
  */
 #include "Arduino.h"
-#include "Controller_All.h"
+#include "Controllers.h"
 
 
-/* ===========================================================================
- *                          Controller_Parent class functions
- * =========================================================================== */
+/* ================================================================================
+ *                             Parent Controller Class
+ * ================================================================================ */
 
 // =====================
 //      Constructor

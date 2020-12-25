@@ -2,7 +2,7 @@
  *    B.L.A.C.Box: Brian Lubkeman's Astromech Controller
  * =================================================================================
  * Peripheral_Dome_Motor.h - Library for a Syren 10 dome motor controller
- * Created by Brian Lubkeman, 22 November 2020
+ * Created by Brian Lubkeman, 17 December 2020
  * Inspired by S.H.A.D.O.W. controller code written by KnightShade
  * Released into the public domain.
  */
@@ -19,7 +19,7 @@ extern HardwareSerial &DomeSerial;
 // Dome automation stages
 
 const uint8_t STOPPED = 0;
-const uint8_t PREPARED = 1;
+const uint8_t READY = 1;
 const uint8_t TURNING = 2;
 
 
@@ -28,7 +28,7 @@ const uint8_t TURNING = 2;
  * ===============================================
  *  PS3 Navigation
  *
- *  Without DEBUG_DRIVEman Switch
+ *  Without Deadman Switch
  *  ======================
  *
  *  Single Controller
@@ -43,8 +43,8 @@ const uint8_t TURNING = 2;
  *  L2+Circle     = Enable dome automation
  *  Nav2 Stick    = Rotate dome at variable speed and direction
  *
- *  With DEBUG_DRIVEman Switch
- *  ======================
+ *  With Deadman Switch
+ *  ===================
  *
  *  Single Controller
  *  -----------------
@@ -58,7 +58,7 @@ const uint8_t TURNING = 2;
  *  L1+Circle     = Enable dome automation
  *  Nav2 Stick    = Rotate dome at variable speed and direction
  *    
- *  Custom addtion to Single Controller w/ or w/o DEBUG_DRIVEman Switch
+ *  Custom addtion to Single Controller w/ or w/o Deadman Switch
  *  ------------------------------------------------------------
  *  Cross         = Rotate dome CW at the fixed speed
  *  Circle        = Rotate dome CCW at the fixed speed
@@ -76,11 +76,7 @@ class Dome_Motor
     void begin(void);
     void automation(void);
     void interpretController(void);
-
-  // For use by attachInterrupt
-    static Dome_Motor * Dome_Motor::anchor;
     void stop(void);
-    static void domeISR(void);
 
   private:
     Buffer * _buffer;
@@ -88,24 +84,21 @@ class Dome_Motor
 
     int _turnDirection;
     float _targetPosition;
-    unsigned long _stopTurnTime;
-    unsigned long _startTurnTime;
-    unsigned long _previousTime;
     int _rotationStatus;
 
-    void _nextCycle(void);
-    uint8_t _getCycle(void);
-    void _resetCycle(void);
+    unsigned long _currentTime;
+    unsigned long _previousTime;
+    unsigned long _startTurnTime;
+    unsigned long _stopTurnTime;
 
-    void _automationOff(void);
+    void _rotateDome(int);
+
+    bool _automationSettingsInvalid;
     void _automationOn(void);
+    void _automationOff(void);
     void _automationInit(void);
     void _automationReady(void);
     void _automationTurn(void);
-
-    void _rotateDome(int);
-    void _stopDome(void);
-    int _mapStick(int);
 
     #if defined(DEBUG_DOME) || defined (DEBUG_ALL)
     String _className;

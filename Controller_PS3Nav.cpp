@@ -2,12 +2,12 @@
  *    B.L.A.C.Box: Brian Lubkeman's Astromech Controller
  * =================================================================================
  * Controller_PS3Nav.cpp - Library for the subclass for the PS3 Move Navigation controller
- * Created by Brian Lubkeman, 22 November 2020
+ * Created by Brian Lubkeman, 17 December 2020
  * Inspired by S.H.A.D.O.W. controller code written by KnightShade
  * Released into the public domain.
  */
 #include "Arduino.h"
-#include "Controller_PS3Nav.h"
+#include "Controllers.h"
 
 #if defined(PS3_NAVIGATION)
 
@@ -15,8 +15,8 @@
  *           Authorized MAC Addresses
  * ============================================ */
 char * PS3NAV_MAC_ADDRESSES[NUMBER_OF_MAC_ADDRESSES] = {
-  "00:06:F7:B8:57:01"
-, "E0:AE:5E:38:E0:CD"
+  "xx:xx:xx:xx:xx:xx"
+, "xx:xx:xx:xx:xx:xx"
 };
 
 
@@ -319,6 +319,7 @@ void Controller_PS3Nav::_connect(PS3BT * pController)
 
   _buffer->setControllerConnected(HALF);
   _initCriticalFault(&_faultData);
+  _buffer->setSpeedProfile(Walk);
   pController->setLedOn(LED1);
 
   // ---------------------------------------

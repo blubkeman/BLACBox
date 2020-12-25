@@ -2,13 +2,13 @@
  *    B.L.A.C.Box: Brian Lubkeman's Astromech Controller
  * =================================================================================
  * Settings_MD_Commands.h - Library for Marcduino command settings
- * Created by Brian Lubkeman, 22 November 2020
+ * Created by Brian Lubkeman, 17 December 2020
  * Inspired by S.H.A.D.O.W. controller code written by KnightShade
  * Released into the public domain.
  */
 
-#ifndef _SETTINGS_MD_COMMANDS_H_
-#define _SETTINGS_MD_COMMANDS_H_
+#ifndef _SETTINGS_MARCDUINO_H_
+#define _SETTINGS_MARCDUINO_H_
 
 const char cmd_None[]            PROGMEM = "";
 const char cmd_FullAwake[]       PROGMEM = ":SE11\r";  // Full Awake

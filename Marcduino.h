@@ -2,7 +2,7 @@
  *    B.L.A.C.Box: Brian Lubkeman's Astromech Controller
  * =================================================================================
  * Peripheral_Marcduino.h - Library for the Marcduino system
- * Created by Brian Lubkeman, 22 November 2020
+ * Created by Brian Lubkeman, 17 December 2020
  * Inspired by S.H.A.D.O.W. controller code written by KnightShade
  * Released into the public domain.
  */
