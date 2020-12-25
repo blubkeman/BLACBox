@@ -15,8 +15,8 @@
  *           Authorized MAC Addresses
  * ============================================ */
 char * PS3NAV_MAC_ADDRESSES[NUMBER_OF_MAC_ADDRESSES] = {
-  "00:06:F7:B8:57:01"
-, "E0:AE:5E:38:E0:CD"
+  "xx:xx:xx:xx:xx:xx"
+, "xx:xx:xx:xx:xx:xx"
 };
 
 
