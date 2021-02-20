@@ -2,7 +2,7 @@
  *    B.L.A.C.Box: Brian Lubkeman's Astromech Controller
  * =================================================================================
  * Peripheral_Marcduino.cpp - Library for the Marcduino system
- * Created by Brian Lubkeman, 17 December 2020
+ * Created by Brian Lubkeman, 20 February 2021
  * Inspired by S.H.A.D.O.W. controller code written by KnightShade
  * Released into the public domain.
  */
@@ -10,236 +10,210 @@
 #include "Marcduino.h"
 #include "Settings_Marcduino.h"
 
-#if defined(MARCDUINO)
-
+/* ================================================================================
+ *                               Marcduino Functions
+ * ================================================================================ */
 // =====================
 //      Constructor
 // =====================
-Marcduino::Marcduino(Buffer* pBuffer)
+#if defined(PS4_CONTROLLER)
+Marcduino::Marcduino(Controller_PS4 * pController)
+#else
+Marcduino::Marcduino(Controller_PS3 * pController)
+#endif
 {
-  _buffer = pBuffer;
+  m_controller = pController;
+  m_customPanelRunning = false;
+  m_holoAutomationRunning = false;
 
-  #if defined(DEBUG_MARCDUINO) || defined (DEBUG_ALL)
-  _className = F("Marcduino::");
+  // ----------
+  // Debugging.
+  // ----------
+
+  #ifdef DEBUG
+  m_className = "Marcduino::";
   #endif
 }
 
-// ================
-//     begin()
-// ================
+// =================
+//      begin()
+// =================
 void Marcduino::begin()
 {
-  #if defined(DEBUG_MARCDUINO) || defined(DEBUG_ALL)
-  output = _className+F("begin()");
-  output += F(" - Marcduino system started.");
-    output += F("\r\n Dome");
-      #ifdef MD_BODY_MASTER
-      output += F(" and body");
-      #endif
-    output += F(" master defined.");
-    output += F("\r\n  Sound to ");
-      #if defined(MD_BODY_MASTER) && defined(BODY_SOUND)
-      output += F("body master.");
-      #else
-      output += F("dome master.");
-      #endif
-  if (Serial) { Serial.println(output); }
+  #ifdef DEBUG
+  output = m_className+F("begin()");
+  output += F(" - ");
+  output += F("Marcduino started.");
+  printOutput();
   #endif
 }
 
-// ==============================
-//     interpretController()
-// ==============================
-void Marcduino::interpretController()
+// ===============================
+//      interpretController()
+// ===============================
+void Marcduino::interpretController(void)
 {
-  // Enter quiet mode if we lose the controllers.
+  // ---------------------------------------
+  // Do nothing when there is no controller.
+  // ---------------------------------------
 
-  if ( ! _buffer->isControllerConnected() ) {
-
-    #if defined(DEBUG_MARCDUINO) || defined (DEBUG_ALL)
-    output = _className+F("interpretController()");
-    output += F(" - No controller. Quiet mode.");
-    if (Serial) { Serial.println(output); }
-    #endif
-
-    _quietMode();
+  if ( m_controller->connectionStatus() == NONE ) {
     return;
   }
 
-  // Skip interpreting when there are no valid buttons pressed.
+  m_mapIndex = -1;
 
-  int8_t btnIdx = _getButtonIndex();
-  if (btnIdx < 0 || btnIdx >= sizeof(domeCommands)) {
+  // ------------------------------
+  // Look for pressed base buttons.
+  // ------------------------------
+
+  byte baseButton = -1;  
+  if ( m_controller->getButtonClick(UP) )            { baseButton = 0; }
+  else if ( m_controller->getButtonClick(RIGHT) )    { baseButton = 1; }
+  else if ( m_controller->getButtonClick(DOWN) )     { baseButton = 2; }
+  else if ( m_controller->getButtonClick(LEFT) )     { baseButton = 3; }
+  else if ( m_controller->getButtonClick(TRIANGLE) ) { baseButton = 4; }
+  else if ( m_controller->getButtonClick(CIRCLE) )   { baseButton = 5; }
+  else if ( m_controller->getButtonClick(CROSS) )    { baseButton = 6; }
+  else if ( m_controller->getButtonClick(SQUARE) )   { baseButton = 7; }
+
+  // ------------------------------------------
+  // Do nothing when no base button is pressed.
+  // ------------------------------------------
+
+  if ( baseButton < 0 ) {
     return;
   }
 
+  // ----------------------------------
+  // Look for pressed modifier buttons.
+  // ----------------------------------
+
+  byte modifierButton = -1;
+
+  if ( m_controller->getButtonPress(L1) || m_controller->getButtonPress(R1) ) {
+    modifierButton = 8;
+  #if defined(PS4_CONTROLLER)
+  } else if ( m_controller->getButtonPress(SHARE) ) {
+  #else
+  } else if ( m_controller->getButtonPress(SELECT) ) {
+  #endif
+    modifierButton = 16;
+  #if defined(PS4_CONTROLLER)
+  } else if ( m_controller->getButtonPress(OPTIONS) ) {
+  #else
+  } else if ( m_controller->getButtonPress(START) ) {
+  #endif
+    modifierButton = 24;
+  #if defined(PS3_NAVIGATION)
+  } else if ( m_controller->getButtonPress(PS) || m_controller->getButtonPress(PS2) ) {
+  #else
+  } else if ( m_controller->getButtonPress(PS) ) {
+  #endif
+    modifierButton = 32;
+  }
+
+  // ----------------------------------------------------------------
+  // Determine the index to use on buttonMap[] to get the command(s).
+  // ----------------------------------------------------------------
+
+  m_mapIndex = baseButton + modifierButton;
+
+
+  // -------------------------------------------
   // Send the command(s) to the master board(s).
+  // -------------------------------------------
 
-  _sendCommand(btnIdx);
+  m_sendCommand(m_mapIndex);
+}
+
+// =====================
+//      quietMode()
+// =====================
+void Marcduino::quietMode(void)
+{
+  
 }
 
 // ======================
 //      automation()
 // ======================
-void Marcduino::automation()
+void Marcduino::automation(void)
 {
-  // Holoprojector automation
-
-  if (_buffer->isHoloAutomationRunning()) {
-    unsigned long currentTime;
-    for (int holoNumber = 0; holoNumber < NUMBER_OF_HOLOPROJECTORS; holoNumber++) {
-
-      // Set the random delay interval for this holoprojector.
-
-      if (_randomSeconds[holoNumber] == 0) {
-        _randomSeconds[holoNumber] = random(AUTO_HP_DELAY_MIN, AUTO_HP_DELAY_MAX + 1) * 1000;
-      }
-
-      // Move both horizontal and vertical servos to a random position.
-
-      currentTime = millis();
-      if (currentTime > (_lastRandomTime[holoNumber] + _randomSeconds[holoNumber])) {
-        _lastRandomTime[holoNumber] = currentTime;
-        _randomSeconds[holoNumber] = 0;
-        _sendCommand(getPgmString(cmd_HPRandomOn), MD_DomeSerial);
-      }
-    }
-  }
+  
 }
 
-// ==============================
-//     runCustomPanelSequence()
-// ==============================
-void Marcduino::runCustomPanelSequence()
+// ==================================
+//      runCustomPanelSequence()
+// ==================================
+void Marcduino::runCustomPanelSequence(void)
 {
-
-  /* FUTURE: This function limits each panel to a single, timed 
-   *  opening/closing. I'm not satisfied with that, but have not 
-   *  yet thought through what is needed to run a more complex 
-   *  sequence.
-   */
-
-
-  #if defined(DEBUG_MARCDUINO) || defined (DEBUG_ALL)
-  output = _className+F("runCustomPanelSequence()");
-  output += F(" - Running custom routine");
-  if (Serial) { Serial.println(output); }
-  #endif
-
-  // Initialize local variables.
-
-  String cmd;
-  String xx = "";
-  uint8_t statusTotal = 0;
-
-  // Repeat for each dome panel.
-
-  for (uint8_t i = 0; i < NUMBER_OF_DOME_PANELS; i++) {
-
-    // Prepare the dome panel number for use in the command string.
-    // Left pad with 0 when the number is a single digit.
-
-    if (i < 10) { xx = "0"; }
-    xx += (String)(i+1);
-
-    // Send the 'open dome panel' command.
-
-    if (_panelState[i].Status == 1) {
-      if ((_panelState[i].Start + (_panelState[i].Start_Delay * 1000)) < millis()) {
-        cmd = ":OP"+xx+"\r";
-        _sendCommand(cmd, MD_DomeSerial);
-        _panelState[i].Status = 2;
-
-        #if defined(DEBUG_MARCDUINO) || defined (DEBUG_ALL)
-        output = F("  Opening panel #");
-        output += i+1;
-        if (Serial) { Serial.println(output); }
-        #endif
-      }
-    }
-
-    // Send the 'close dome panel' command.
-
-    if (_panelState[i].Status == 2) {
-      if ((_panelState[i].Start + ((_panelState[i].Start_Delay + _panelState[i].Open_Time) * 1000)) < millis()) {
-        cmd = ":CL"+xx+"\r";
-        _sendCommand(cmd, MD_DomeSerial);
-        _panelState[i].Status = 0;
-
-        #if defined(DEBUG_MARCDUINO) || defined (DEBUG_ALL)
-        output = F("  Closing panel #");
-        output += i+1;
-        if (Serial) { Serial.println(output); }
-        #endif
-      }
-    }
-    statusTotal += _panelState[i].Status;
-  }
-
-  // If all the panels have now closed - close out the custom routine
-
-  if (statusTotal == 0) {
-//     _buffer->setStatus(Status::CustomDomePanelRunning, false);
-     _buffer->setDomeCustomPanelRunning(false);
-  }
+  
 }
 
-// ========================
-//      _sendCommand()
-// ========================
-void Marcduino::_sendCommand(uint8_t btnIdx)
+// ================================
+//      isCustomPanelRunning()
+// ================================
+bool Marcduino::isCustomPanelRunning(void)
 {
-  String pgmString;
+  return m_customPanelRunning;
+}
 
-  // Lookup the dome command.
-  // When found, send it to the dome master.
-  // When not found, do nothing.
+// =========================
+//      m_sendCommand()
+// =========================
+void Marcduino::m_sendCommand(byte mapIndex)
+{
+  // -----------------------------------------------
+  // Lookup the dome command. When found, send it
+  // to the dome master. When not found, do nothing.
+  // -----------------------------------------------
 
-  pgmString = getPgmString(domeCommands[btnIdx]);
+  String pgmString = getPgmString(buttonMap[mapIndex].domeCommand);
   if (pgmString != "") {
-    _sendCommand(pgmString, MD_DomeSerial);
+    m_sendCommand(pgmString, &MD_Dome_Serial);
 
-    #if defined(DEBUG_MARCDUINO) || defined(DEBUG_ALL)
-    output = _className+F("_sendCommand()");
-    output += F(" - Send ");
+    #ifdef DEBUG
+    output = m_className+F("m_sendCommand()");
+    output += F(" - ");
+    output += F("Send ");
     output += pgmString;
     output += F(" to dome master.");
-    if (Serial) { Serial.println(output); }
+    printOutput();
     #endif
   }
 
-  // Lookup the body command.
-  // When found, send it to the body master.
-  // When not found, do nothing.
+  // -----------------------------------------------
+  // Lookup the body command. When found, send it
+  // to the body master. When not found, do nothing.
+  // -----------------------------------------------
 
   #ifdef MD_BODY_MASTER
-  pgmString = getPgmString(bodyCommands[btnIdx]);
+  pgmString = getPgmString(buttonMap[mapIndex].bodyCommand);
   if (pgmString != "") {
-    _sendCommand(pgmString, MD_BodySerial);
+    m_sendCommand(pgmString, &MD_Body_Serial);
 
-    #if defined(DEBUG_MARCDUINO) || defined(DEBUG_ALL)
-    output = _className+F("_sendCommand()");
-    output += F(" - Send ");
+    #ifdef DEBUG
+    output = m_className+F("m_sendCommand()");
+    output += F(" - ");
+    output += F("Send ");
     output += pgmString;
     output += F(" to body master.");
-    if (Serial) { Serial.println(output); }
+    printOutput();
     #endif
   }
   #endif
-};
-
-void Marcduino::_sendCommand(String inStr, HardwareSerial targetSerial)
+}
+void Marcduino::m_sendCommand(String inStr, HardwareSerial * targetSerial)
 {
+  // --------------------------------------------------------------
   // This function allows for the use of either a slip ring (wired)
   //  or a Feather Radio (wireless) connection to the dome.
+  // --------------------------------------------------------------
 
-  #ifndef FEATHER_RADIO
+  #if defined(FEATHER_RADIO)
 
-  targetSerial.print(inStr);
-
-  #else
-
-  if (targetSerial == MD_BodySerial) {
+  if (targetSerial == MD_Body_Serial) {
     targetSerial.print(inStr);
   } else {
     // Send one character at a time to the Feather Radio.
@@ -248,108 +222,33 @@ void Marcduino::_sendCommand(String inStr, HardwareSerial targetSerial)
     }
   }
 
-  #endif
-};
-
-// =====================================
-//      _getButtonIndex()
-// =====================================
-int8_t Marcduino::_getButtonIndex()
-{
-// This function evaluates which buttons are pressed and returns the index
-// value appropriate for the _functionTypes and _standardFunctions arrays.
-
-  int8_t out = -1;
-
-  // First, check the D-pad buttons.
-
-  if (_buffer->getButton(UP))          { out = 0; }
-  else if (_buffer->getButton(RIGHT))  { out = 1; }
-  else if (_buffer->getButton(DOWN))   { out = 2; }
-  else if (_buffer->getButton(LEFT))   { out = 3; }
-  if (_buffer->getButton(TRIANGLE))    { out = 20; }
-  else if (_buffer->getButton(CIRCLE)) { out = 21; }
-  else if (_buffer->getButton(CROSS))  { out = 22; }
-  else if (_buffer->getButton(SQUARE)) { out = 23; }
-
-  // Next, check for modifier buttons.
-  // L2 and R2 are not evaluated here. They are
-  //  evaluated in the dome and drive motor code.
-
-  if (out > -1) {
-    if (_buffer->getButton(SELECT))     { out += 4; }
-    else if (_buffer->getButton(START)) { out += 8; }
-    else if (_buffer->getButton(PS) || \
-             _buffer->getButton(PS2))   { out += 12; }
-    else if (_buffer->getButton(L1) || \
-             _buffer->getButton(R1))    { out += 16; }
-  }
-
-  #if defined(DEBUG_MARCDUINO) || defined (DEBUG_ALL)
-  if (out > -1) {
-    output = _className+F("_getStandardFunctionIndex()");
-    output += F(" - sfIndex: ");
-    output += out;
-    if (Serial) { Serial.println(output); }
-  }
-  #endif
-
-  // Return the result.
-
-  return out;
-};
-
-// ======================
-//      _quietMode()
-// ======================
-void Marcduino::_quietMode()
-{
-  #if defined(MD_BODY_MASTER) && defined(BODY_SOUND)
-  _sendCommand(getPgmString(cmd_DomeQuiet), MD_DomeSerial);
-  _sendCommand(getPgmString(cmd_BodyQuiet), MD_BodySerial);
   #else
-  _sendCommand(getPgmString(cmd_QuietMode), MD_DomeSerial);
+
+  targetSerial->print(inStr);
+
   #endif
 }
 
-// ==========================
-//      _setPanelState()
-// ==========================
-uint8_t Marcduino::_setPanelState(uint8_t idx)
+// ===========================
+//      m_setPanelState()
+// ===========================
+byte Marcduino::m_setPanelState(byte)
 {
-  // This may be an unused function.
-
-  uint8_t statusTotal = 0;
-  for (uint8_t i = 0; i < NUMBER_OF_DOME_PANELS; i++) {
-    if (_myPanels[i].Use) {
-      _panelState[i].Status = 1;
-      _panelState[i].Start = millis();
-      _panelState[i].Start_Delay = _myPanels[i].Start_Delay;
-      _panelState[i].Open_Time   = _myPanels[i].Open_Time;
-      if ( _myPanels[i].Start_Delay > 30 || \
-           _myPanels[i].Start_Delay < 0  || \
-           _myPanels[i].Open_Time > 30   || \
-           _myPanels[i].Open_Time < 0 )
-        _panelState[i].Status = 0;
-    }
-    statusTotal += _panelState[i].Status;
-  }
-
-  #if defined(DEBUG_MARCDUINO) || defined (DEBUG_ALL)
-  if (statusTotal > 0) {
-    output = _className+F("_setPanelState()");
-    if (Serial) { Serial.println(output); }
-    for (uint8_t i = 0; i < NUMBER_OF_DOME_PANELS; i++) {
-      output = F(" - Panel #"); output += i+1;
-      output += F(" Status: "); output += _panelState[i].Status;
-      output += F(" Start: "); output += _panelState[i].Start;
-      output += F(" Delay: "); output += _panelState[i].Start_Delay;
-      output += F(" Open: "); output += _panelState[i].Open_Time;
-      if (Serial) { Serial.println(output); }
-    }
-  }
-  #endif
-
-  return statusTotal;
+  
 }
-#endif
+
+// ======================================
+//      m_setHoloAutomationRunning()
+// ======================================
+void Marcduino::m_setHoloAutomationRunning(bool)
+{
+  
+}
+
+// =====================================
+//      m_isHoloAutomationRunning()
+// =====================================
+bool Marcduino::m_isHoloAutomationRunning(void)
+{
+  
+}
