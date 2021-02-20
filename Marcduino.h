@@ -2,28 +2,28 @@
  *    B.L.A.C.Box: Brian Lubkeman's Astromech Controller
  * =================================================================================
  * Peripheral_Marcduino.h - Library for the Marcduino system
- * Created by Brian Lubkeman, 17 December 2020
+ * Created by Brian Lubkeman, 20 February 2021
  * Inspired by S.H.A.D.O.W. controller code written by KnightShade
  * Released into the public domain.
  */
-#ifndef _PERIPHERAL_MARCDUINO_H_
-#define _PERIPHERAL_MARCDUINO_H_
+#ifndef _MARCDUINO_H_
+#define _MARCDUINO_H_
 
-#include "Buffer.h"
-#include <avr/pgmspace.h>
+#include "Controller.h"
 
 extern String output;
 extern void printOutput(void);
-extern String getPgmString(const char *); // Used with command arrays.
-extern String getPgmString(const char);   // Used with cmd_xx constants.
-extern HardwareSerial &DomeSerial;
+
+extern String getPgmString(const char *);
 
 #ifdef MARCDUINO
-extern HardwareSerial &MD_DomeSerial;
+extern HardwareSerial &MD_Dome_Serial;
 #ifdef MD_BODY_MASTER
-extern HardwareSerial &MD_BodySerial;
+extern HardwareSerial &MD_Body_Serial;
 #endif
 #endif
+
+const int MARCDUINO_BAUD_RATE = 9600;  // Do not change this!
 
 
 /* ==========================================
@@ -48,36 +48,41 @@ typedef struct {
  * ========================================================= */
 class Marcduino {
 
+  private:
+    #if defined(PS4_CONTROLLER)
+    Controller_PS4 * m_controller;
+    #else
+    Controller_PS3 * m_controller;
+    #endif
+    PanelState_Struct _panelState[NUMBER_OF_DOME_PANELS];
+    CustomPanelRoutine_Struct _myPanels[NUMBER_OF_DOME_PANELS];
+    unsigned long m_randomSeconds[3];
+    unsigned long m_lastRandomTime[3];
+    byte m_mapIndex;
+    bool m_customPanelRunning;
+    bool m_holoAutomationRunning;
+
+    void m_sendCommand(byte);
+    void m_sendCommand(String, HardwareSerial *);
+    byte m_setPanelState(byte);
+    void m_setHoloAutomationRunning(bool);
+    bool m_isHoloAutomationRunning(void);
+
+    #ifdef DEBUG
+    String m_className;
+    #endif
+
   public:
-    Marcduino(Buffer * pBuffer);
+    #if defined(PS4_CONTROLLER)
+    Marcduino(Controller_PS4 * pController);
+    #else
+    Marcduino(Controller_PS3 * pController);
+    #endif
     void begin(void);
     void interpretController(void);
+    void quietMode(void);
     void automation(void);
     void runCustomPanelSequence(void);
-    bool exists(void) { return true; };
-
-  private:
-    Buffer * _buffer;
-
-    int8_t _getButtonIndex();
-    void _sendCommand(uint8_t);         // Used with command arrays
-    void _sendCommand(String, HardwareSerial); // Send a string to a given Serial
-    void _quietMode();
-
-  // For custom panel routines.
-    CustomPanelRoutine_Struct  _panelRoutine_NONE[NUMBER_OF_DOME_PANELS];
-    CustomPanelRoutine_Struct  _panelRoutine_PSUP[NUMBER_OF_DOME_PANELS];
-    CustomPanelRoutine_Struct  _myPanels[NUMBER_OF_DOME_PANELS];
-    PanelState_Struct     _panelState[NUMBER_OF_DOME_PANELS]; 
-    uint8_t _setPanelState(uint8_t);
-
-  // For automation.
-    unsigned long _randomSeconds[3];
-    unsigned long _lastRandomTime[3];
-
-    #if defined(DEBUG_MARCDUINO) || defined (DEBUG_ALL)
-    String _className;
-    String output;
-    #endif
+    bool isCustomPanelRunning(void);
 };
 #endif
