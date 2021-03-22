@@ -33,8 +33,8 @@
 // =================================================================
 #if defined(PS3_NAVIGATION)
 
-const char addr1[] PROGMEM = "00:06:F7:B8:57:01";
-const char addr2[] PROGMEM = "E0:AE:5E:38:E0:CD";
+const char addr1[] PROGMEM = "XX:XX:XX:XX:XX:XX";
+const char addr2[] PROGMEM = "YY:YY:YY:YY:YY:YY";
 
 const byte NUMBER_OF_MAC_ADDRESSES = 2;
 
@@ -43,7 +43,7 @@ const char * authorizedMACAddresses[NUMBER_OF_MAC_ADDRESSES] = { addr1, addr2 };
 // =================================================================
 #elif defined(PS3_CONTROLLER)
 
-const char addr1[] PROGMEM = "38:C0:96:DD:15:DD";
+const char addr1[] PROGMEM = "XX:XX:XX:XX:XX:XX";
 
 const byte NUMBER_OF_MAC_ADDRESSES = 1;
 
@@ -52,7 +52,7 @@ const char * authorizedMACAddresses[NUMBER_OF_MAC_ADDRESSES] = { addr1 };
 // =================================================================
 #elif defined(PS4_CONTROLLER)
 
-const char addr1[] PROGMEM = "4C:B9:9B:21:63:3E";
+const char addr1[] PROGMEM = "XX:XX:XX:XX:XX:XX";
 
 const byte NUMBER_OF_MAC_ADDRESSES = 1;
 
