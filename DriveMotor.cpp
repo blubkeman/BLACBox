@@ -2,7 +2,7 @@
  *    B.L.A.C.Box: Brian Lubkeman's Astromech Controller
  * =================================================================================
  * DriveMotor.cpp - Library for supported drive motor controllers
- * Created by Brian Lubkeman, 20 February 2021
+ * Created by Brian Lubkeman, 22 March 2021
  * Inspired by S.H.A.D.O.W. controller code written by KnightShade
  * Released into the public domain.
  */
@@ -157,14 +157,14 @@ void DriveMotor::interpretController(void)
   // ----------------------------------------------------------------
 
   if ( ! m_isDeadmanPressed() ) {
-
+/*
     #ifdef DEBUG
     output = F("DriveMotor::interpretController()");
     output += F(" - ");
     output += F("Deadman not pressed");
     printOutput();
     #endif
-
+*/
     stop();
     return;
   }
@@ -280,7 +280,7 @@ void DriveMotor::m_updateSpeedProfile(void)
   #endif
 
   m_controller->setLed();
-  m_writeSpeedProfile();
+  m_writeScript();
 
   #ifdef DEBUG
   output = m_className+F("m_updateSpeedProfile()");

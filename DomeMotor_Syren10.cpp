@@ -2,19 +2,30 @@
  *    B.L.A.C.Box: Brian Lubkeman's Astromech Controller
  * =================================================================================
  * DomeMotor_Syren10.cpp - Library for the Syren10 dome motor controller
- * Created by Brian Lubkeman, 20 February 2021
+ * Created by Brian Lubkeman, 22 March 2021
  * Inspired by S.H.A.D.O.W. controller code written by KnightShade
  * Released into the public domain.
  */
 #include <Arduino.h>
 #include "DomeMotor.h"
 
+
 #if defined(SYREN10)
 /* ================================================================================
  *                          Syren10 Motor Controller Class
  * ================================================================================ */
 
+// We use packetized serial mode. Make certain dip switches 1 and 2 are down.
+// Dip switch 3 should up *unless and only* if you use Lipo batteries. Then it should be down.
+
+// Set the dip switches 4, 5, and 6 according to the address to be used.
+// 128 = 4,5,6 all up     132 = 6 down; 4,5 up
+// 129 = 4 down; 5,6 up   133 = 6,4 down; 5 up
+// 130 = 5 down; 4,6 up   134 = 6,5 down; 4 up
+// 131 = 4,5 down; 6 up   135 = 4,5,6 all down
+
 const int SYREN_ADDR = 129;  // Serial Address for Dome Syren
+
 
 // =====================
 //      Constructor
@@ -46,9 +57,9 @@ Syren10_DomeMotor::~Syren10_DomeMotor(void) {}
 // =================
 void Syren10_DomeMotor::begin(void)
 {
-  // -----------------------------------------------------------------------------
-  // Call the parent class's begin(). It establishes our dead man switch, if used.
-  // -----------------------------------------------------------------------------
+  // --------------------------------
+  // Call the parent class's begin().
+  // --------------------------------
 
   DomeMotor::begin();
 
@@ -56,7 +67,7 @@ void Syren10_DomeMotor::begin(void)
   // Start communication with the Syren10.
   // -------------------------------------
 
-  m_syren.autobaud();
+  DomeMotorSerial.begin(9600);
   m_syren.setTimeout(300);
   m_syren.stop();
 
@@ -115,7 +126,6 @@ void Syren10_DomeMotor::stop(void)
 // ========================
 void Syren10_DomeMotor::m_rotateDome(int rotationSpeed)
 {
-
   // ------------------------
   // Send the rotate command.
   // ------------------------

@@ -2,7 +2,7 @@
  *    B.L.A.C.Box: Brian Lubkeman's Astromech Controller
  * =================================================================================
  * Settings.h - Library for user settings
- * Created by Brian Lubkeman, 20 February 2021
+ * Created by Brian Lubkeman, 22 March 2021
  * Inspired by S.H.A.D.O.W. controller code written by KnightShade
  * Released into the public domain.
  */
@@ -53,7 +53,7 @@ const byte NUMBER_OF_PERIPHERALS = 2;
 // Uncomment the following line if you are using a dead
 // man switch with the drive system.
 
-//#define DEADMAN
+#define DEADMAN
 
 // Choose which stick controls your drive system.
 // Configure the following ONLY when using a PS3 or PS4 controller.
@@ -89,29 +89,25 @@ const byte DOME_AUTO_SPEED_MAX = 101;     // Maximum auto dome speed to allow au
 //            Marcduino Settings
 // ========================================
 
-// Uncomment the following line if you are using
-// at least one Marcduino master board.
-
-#define MARCDUINO
-
-// Uncomment the following line if your build
-// includes the optional body master board.
+#define MARCDUINO         // Uncomment this line if you are using at least one Marcduino master board.
 
 #if defined(MARCDUINO)
-#define MD_BODY_MASTER
-#endif
 
-// Uncomment the following line if your build includes the
-// optional body master board, and you use it to handle sound.
+#define MD_BODY_MASTER    // Uncomment this line if you are using the optional Marcduino body master.
+//#define MD_CUSTOM_CMDS  // Uncomment this line if you define your own custom mappings in Settings_Marcduino.h.
 
 #if defined(MD_BODY_MASTER)
-#define MD_BODY_SOUND
+#define MD_BODY_SOUND     // Uncomment this line if your body master controls the sound system.
 #endif
 
-// Identify how many dome panels have the ability to be
-// opened/closed. Marcduino supports up to 10 panels maximum.
+#endif
 
-const byte NUMBER_OF_DOME_PANELS = 10;
+//#define MAGIC_PANEL     // Uncomment this line if your dome includes a magic panel.
+
+const byte NUMBER_OF_DOME_PANELS = 10;   // Specify how many dome panels are in use.
+const byte NUMBER_OF_HOLOPROJECTORS = 3; // Specify how many holoprojectors are in use.
+const byte AUTO_HP_DELAY_MIN = 2;        // Specify in seconds. Minimum time between automated holoprojector movements.
+const byte AUTO_HP_DELAY_MAX = 10;       // Specify in seconds. Maximum time between automated holoprojector movements.
 
 // ========================================
 //          Miscellaneous Settings
@@ -128,8 +124,6 @@ const byte LEFTFOOT_PIN  = 44;
 const byte RIGHTFOOT_PIN = 45;
 #endif
 const byte DEADMAN_PIN = 47;
-
-
 
 const int SERIAL_LATENCY = 25;  //This is a delay factor in ms to prevent queueing of the Serial data.
                                 //25ms seems appropriate for HardwareSerial, values of 50ms or larger are needed for Softare Emulation

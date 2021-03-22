@@ -2,7 +2,7 @@
  *    B.L.A.C.Box: Brian Lubkeman's Astromech Controller
  * =================================================================================
  * DomeMotor.h - Library for supported dome motor controllers
- * Created by Brian Lubkeman, 20 February 2021
+ * Created by Brian Lubkeman, 22 March 2021
  * Inspired by S.H.A.D.O.W. controller code written by KnightShade
  * Released into the public domain.
  */
@@ -15,8 +15,10 @@
 extern bool domeStopped;
 extern HardwareSerial &DomeMotorSerial;
 
+#if defined(DEBUG) || defined(TEST_CONTROLLER)
 extern String output;
 extern void printOutput(void);
+#endif
 
 // Dome automation stages
 
@@ -61,12 +63,14 @@ class DomeMotor
     virtual ~DomeMotor(void);
     void begin(void);
     void interpretController(void);
-    void automation(void);
+    void runAutomation(void);
     bool isAutomationRunning(void);
 
     virtual void stop(void) {};
 };
 
+
+#if defined(SYREN10)
 /* ================================================================================
  *                              Syren10 Dome Motor Class
  * ================================================================================ */
@@ -88,4 +92,6 @@ class Syren10_DomeMotor : public DomeMotor
 
     virtual void stop(void);
 };
+#endif
+
 #endif
