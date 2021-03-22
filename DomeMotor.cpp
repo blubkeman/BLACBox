@@ -2,7 +2,7 @@
  *    B.L.A.C.Box: Brian Lubkeman's Astromech Controller
  * =================================================================================
  * DomeMotor.cpp - Library for supported dome motor controllers
- * Created by Brian Lubkeman, 20 February 2021
+ * Created by Brian Lubkeman, 22 March 2021
  * Inspired by S.H.A.D.O.W. controller code written by KnightShade
  * Released into the public domain.
  */
@@ -156,15 +156,14 @@ void DomeMotor::interpretController(void)
 
   #if defined(PS3_NAVIGATION)
 
-  // -------------------------
-  // Dual PS3 Nav controller
-  // =======================
-  // Primary stick = Drive   Optional stick = Dome
-  //
-  // Single PS3 Nav controller
-  // =========================
-  // Primary stick = Drive   L2 + Primary stick = Dome
-  // -------------------------
+  /* ===============================================
+   * 
+   *          Dual PS3 Navs   Single PS3 Nav
+   *          --------------  ------------------
+   * Drive    Primary stick   Primary stick
+   * Dome     Optional stick  L2 + Primary stick
+   *
+   * =============================================== */
   
   if ( m_controller->connectionStatus() == HALF ) {
     if ( ! m_controller->getButtonPress(L2) ) {
@@ -179,13 +178,16 @@ void DomeMotor::interpretController(void)
   
   #else
 
-  // ---------------------
-  // PS3 or PS4 Controller
-  // =====================
-  // Left stick = Drive  Right stick = Dome
-  //          or
-  // Left stick = Dome   Right stick = Drive
-  // ---------------------
+  /* ===============================================
+   * 
+   *          PS3 or PS4       PS3 or PS4
+   *          -----------  or  ------------------
+   * Drive    Left stick       Right stick
+   * Dome     Right stick      Left stick
+   *
+   * This is configurable in the Settings.h tab.
+   * 
+   * =============================================== */
 
   if ( DRIVE_STICK == 0 ) {
     stickPosition = m_controller->getAnalogHat(RightHatX);
@@ -283,10 +285,10 @@ void DomeMotor::m_automationOff(void)
   #endif
 }
 
-// ======================
-//      automation()
-// ======================
-void DomeMotor::automation(void)
+// =========================
+//      runAutomation()
+// =========================
+void DomeMotor::runAutomation(void)
 {
   // ----------------------------------------------
   // Do not run automation if settings are invalid.

@@ -2,7 +2,7 @@
  *    B.L.A.C.Box: Brian Lubkeman's Astromech Controller
  * =================================================================================
  * Controller.h - Library for supported controllers
- * Created by Brian Lubkeman, 20 February 2021
+ * Created by Brian Lubkeman, 22 March 2021
  * Inspired by S.H.A.D.O.W. controller code written by KnightShade
  * Released into the public domain.
  */
@@ -15,12 +15,15 @@
 #include <PS3BT.h>
 #include "Settings.h"
 
+#if defined(DEBUG) || defined(TEST_CONTROLLER)
+extern String output;
+extern void printOutput(void);
+#endif
+
 extern bool driveEnabled;
 extern bool driveStopped;
 extern byte speedProfile;
 
-extern String output;
-extern void printOutput(void);
 extern String getPgmString(const char *);
 
 #define PS2 17
@@ -70,12 +73,11 @@ class Controller_Parent
     void m_initCriticalFault(byte idx);
     void m_resetCriticalFault(byte idx);
 
-    virtual void m_connect(void);
+    virtual void m_connect(void) {};
     virtual void m_disconnect(void) {};
-    virtual void m_takeSnapshot(void) {};
-    virtual bool m_getUsbPlugged(void) {};
-    virtual bool m_connected(void) {};
+    virtual bool m_getUsbStatus(void) {};
     virtual bool m_detectCriticalFault(void);
+    virtual int  m_getModifierButtons(void) {};
 
     #ifdef TEST_CONTROLLER
     void m_displayInput(void);
@@ -87,17 +89,20 @@ class Controller_Parent
   public:
     Controller_Parent(void);
     virtual ~Controller_Parent(void);
+
     void begin(void);
     byte connectionStatus(void);
-    bool isControllerLost(void);
     void onDisconnect(void);
+    bool duringDisconnect(void);
+    int  getButtonsPressed(void);
 
     virtual bool read(void) {};
-    virtual void setLed(void) {};
+    virtual bool connected(void) {};
     virtual bool getButtonClick(int buttonEnum) {};
     virtual bool getButtonPress(int buttonEnum) {};
     virtual int  getAnalogButton(int buttonEnum) {};
-    virtual int getAnalogHat(int stickEnum) {};
+    virtual int  getAnalogHat(int stickEnum) {};
+    virtual void setLed(void) {};
 };
 
 
@@ -112,9 +117,11 @@ class Controller_PS4 : public Controller_Parent
 
     static void m_onInit(void);
 
+    virtual void m_connect(void);
     virtual void m_disconnect(void);
-    virtual bool m_getUsbPlugged(void);
-    virtual bool m_connected(void);
+    virtual bool m_getUsbStatus(void);
+    virtual bool connected(void);
+    virtual int  m_getModifierButtons(void);
 
   public:
     static Controller_PS4 * Controller_PS4::anchor;
@@ -144,9 +151,11 @@ class Controller_PS3 : public Controller_Parent
 
     static void m_onInit(void);
 
+    virtual void m_connect(void);
     virtual void m_disconnect(void);
-    virtual bool m_getUsbPlugged(void);
-    virtual bool m_connected(void);
+    virtual bool m_getUsbStatus(void);
+    virtual bool connected(void);
+    virtual int  m_getModifierButtons(void);
 
   public:
     static Controller_PS3 * Controller_PS3::anchor;
@@ -180,10 +189,11 @@ class Controller_PS3Nav : public Controller_Parent
     void m_onInitConnect(void);
 
     virtual void m_connect(PS3BT * pController);
+    virtual bool connected(PS3BT * pController);
     virtual void m_disconnect(PS3BT * pController);
-    virtual bool m_getUsbPlugged(void);
-    virtual bool m_connected(PS3BT * pController);
+    virtual bool m_getUsbStatus(void);
     virtual bool m_detectCriticalFault(PS3BT * pController);
+    virtual int  m_getModifierButtons(void);
 
   public:
     static Controller_PS3Nav * Controller_PS3Nav::anchor;

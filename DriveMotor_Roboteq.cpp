@@ -2,7 +2,7 @@
  *    B.L.A.C.Box: Brian Lubkeman's Astromech Controller
  * =================================================================================
  * DriveMotor_Roboteq.cpp - Library for the Roboteq SBL2360 or SBL1360 drive motor controller
- * Created by Brian Lubkeman, 20 February 2021
+ * Created by Brian Lubkeman, 22 March 2021
  * Inspired by S.H.A.D.O.W. controller code written by KnightShade
  * Released into the public domain.
  */
@@ -82,7 +82,8 @@ void Roboteq_DriveMotor::begin(void)
   #ifdef DEBUG
   output = m_className+F("begin()");
   output += F(" - ");
-  output += F("Roboteq motor controller started.");
+  output += F("Roboteq");
+  output += F(" motor controller started.");
   printOutput();
   #endif
 }
@@ -117,7 +118,7 @@ void Roboteq_DriveMotor::stop(void)
 
   #if defined(PULSE)
 
-  m_pulseWrite(SERVO_CENTER);
+  m_writePulse(SERVO_CENTER);
 
   #elif defined(SERIAL)
 
@@ -165,7 +166,7 @@ void Roboteq_DriveMotor::m_drive(void)
 
   #if defined(PULSE)
 
-  m_pulseWrite(m_input1, m_input2);
+  m_writePulse(m_input1, m_input2);
 
   #elif defined(RS232)
 
@@ -235,24 +236,23 @@ void Roboteq_DriveMotor::m_mapInputs(int steering, int throttle)
 
 #if defined(PULSE)
 // ========================
-//      m_pulseWrite()
+//      m_writePulse()
 // ========================
-void Roboteq_DriveMotor::m_pulseWrite(int input1, int input2)
+void Roboteq_DriveMotor::m_writePulse(int input1, int input2)
 {
   m_pulse1Signal.write(input1);
   m_pulse2Signal.write(input2);
 }
-void Roboteq_DriveMotor::m_pulseWrite(int input1)
+void Roboteq_DriveMotor::m_writePulse(int input)
 {
-  m_pulse1Signal.write(input1);
-  m_pulse2Signal.write(input1);
+  m_writePulse(input, input);
 }
 #endif
 
 // ===============================
-//      m_writeSpeedProfile()
+//      m_writeScript()
 // ===============================
-void Roboteq_DriveMotor::m_writeSpeedProfile(void)
+void Roboteq_DriveMotor::m_writeScript(void)
 {
   m_scriptSignal.write(speedProfile);
 }

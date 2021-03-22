@@ -2,7 +2,7 @@
  *    B.L.A.C.Box: Brian Lubkeman's Astromech Controller
  * =================================================================================
  * DriveMotor.h - Library for supported drive motor controllers
- * Created by Brian Lubkeman, 20 February 2021
+ * Created by Brian Lubkeman, 22 March 2021
  * Inspired by S.H.A.D.O.W. controller code written by KnightShade
  * Released into the public domain.
  */
@@ -15,8 +15,10 @@ extern bool driveEnabled;
 extern bool driveStopped;
 extern byte speedProfile;
 
+#if defined(DEBUG) || defined(TEST_CONTROLLER)
 extern String output;
 extern void printOutput(void);
+#endif
 
 extern HardwareSerial &DriveSerial;
 
@@ -44,7 +46,7 @@ class DriveMotor
     void m_updateSpeedProfile(void);
 
     virtual void m_drive(void) {};
-    virtual void m_writeSpeedProfile(void) {};
+    virtual void m_writeScript(void) {};
 
     #if defined(SBL1360) || defined(SABERTOOTH)
     void m_mixBHD(byte stickX, byte stickY);
@@ -84,15 +86,15 @@ class Roboteq_DriveMotor : public DriveMotor
     #endif
 
     virtual void m_drive(void);
-    virtual void m_writeSpeedProfile(void);
+    virtual void m_writeScript(void);
 
     #if defined(SBL2360)
     void m_mapInputs(int steering, int throttle);
     #endif
 
     #if defined(PULSE)
-    void m_pulseWrite(int input1, int input2);
-    void m_pulseWrite(int input1);
+    void m_writePulse(int input1, int input2);
+    void m_writePulse(int input);
     #endif
 
   public:

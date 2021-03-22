@@ -2,13 +2,18 @@
  *    B.L.A.C.Box: Brian Lubkeman's Astromech Controller
  * =================================================================================
  * Peripheral_Marcduino.cpp - Library for the Marcduino system
- * Created by Brian Lubkeman, 20 February 2021
+ * Created by Brian Lubkeman, 22 March 2021
  * Inspired by S.H.A.D.O.W. controller code written by KnightShade
  * Released into the public domain.
  */
 #include "Arduino.h"
 #include "Marcduino.h"
-#include "Settings_Marcduino.h"
+
+#if defined(MD_CUSTOM_CMDS)
+#include "Marcduino_Custom_Mappings.h"
+#else
+#include "Marcduino_Standard_Mappings.h"
+#endif
 
 /* ================================================================================
  *                               Marcduino Functions
@@ -61,70 +66,28 @@ void Marcduino::interpretController(void)
     return;
   }
 
-  m_mapIndex = -1;
+  // ---------------------------------------------------
+  // Determine what button combination is being pressed.
+  // ---------------------------------------------------
 
-  // ------------------------------
-  // Look for pressed base buttons.
-  // ------------------------------
-
-  byte baseButton = -1;  
-  if ( m_controller->getButtonClick(UP) )            { baseButton = 0; }
-  else if ( m_controller->getButtonClick(RIGHT) )    { baseButton = 1; }
-  else if ( m_controller->getButtonClick(DOWN) )     { baseButton = 2; }
-  else if ( m_controller->getButtonClick(LEFT) )     { baseButton = 3; }
-  else if ( m_controller->getButtonClick(TRIANGLE) ) { baseButton = 4; }
-  else if ( m_controller->getButtonClick(CIRCLE) )   { baseButton = 5; }
-  else if ( m_controller->getButtonClick(CROSS) )    { baseButton = 6; }
-  else if ( m_controller->getButtonClick(SQUARE) )   { baseButton = 7; }
-
-  // ------------------------------------------
-  // Do nothing when no base button is pressed.
-  // ------------------------------------------
-
-  if ( baseButton < 0 ) {
+  m_buttonIndex = m_controller->getButtonsPressed();
+  if ( m_buttonIndex < 0 || m_buttonIndex > sizeof(buttonMap)-1 ) {
     return;
   }
 
-  // ----------------------------------
-  // Look for pressed modifier buttons.
-  // ----------------------------------
-
-  byte modifierButton = -1;
-
-  if ( m_controller->getButtonPress(L1) || m_controller->getButtonPress(R1) ) {
-    modifierButton = 8;
-  #if defined(PS4_CONTROLLER)
-  } else if ( m_controller->getButtonPress(SHARE) ) {
-  #else
-  } else if ( m_controller->getButtonPress(SELECT) ) {
+  #if defined(DEBUG)
+  output = m_className+F("interpretController()");
+  output += F(" - ");
+  output += F("mapIndex = ");
+  output += m_buttonIndex;
+  printOutput();
   #endif
-    modifierButton = 16;
-  #if defined(PS4_CONTROLLER)
-  } else if ( m_controller->getButtonPress(OPTIONS) ) {
-  #else
-  } else if ( m_controller->getButtonPress(START) ) {
-  #endif
-    modifierButton = 24;
-  #if defined(PS3_NAVIGATION)
-  } else if ( m_controller->getButtonPress(PS) || m_controller->getButtonPress(PS2) ) {
-  #else
-  } else if ( m_controller->getButtonPress(PS) ) {
-  #endif
-    modifierButton = 32;
-  }
-
-  // ----------------------------------------------------------------
-  // Determine the index to use on buttonMap[] to get the command(s).
-  // ----------------------------------------------------------------
-
-  m_mapIndex = baseButton + modifierButton;
-
 
   // -------------------------------------------
   // Send the command(s) to the master board(s).
   // -------------------------------------------
 
-  m_sendCommand(m_mapIndex);
+  m_sendCommand(m_buttonIndex);
 }
 
 // =====================
@@ -132,15 +95,51 @@ void Marcduino::interpretController(void)
 // =====================
 void Marcduino::quietMode(void)
 {
-  
+  #if defined(MD_BODY_MASTER)
+  m_sendCommand(cmd_DomeQuiet, &MD_Dome_Serial);
+    #if defined(MD_BODY_SOUND)
+    m_sendCommand(cmd_BodyQuiet, &MD_Body_Serial);
+    #else
+    m_sendCommand(cmd_ClosePanelAll, &MD_Body_Serial);
+    #endif
+  #else
+  m_sendCommand(cmd_QuietMode, &MD_Dome_Serial);
+  #endif
 }
 
-// ======================
-//      automation()
-// ======================
-void Marcduino::automation(void)
+// =========================
+//      runAutomation()
+// =========================
+void Marcduino::runAutomation(void)
 {
-  
+  // ------------------------
+  // Holoprojector automation
+  // ------------------------
+
+  if ( m_holoAutomationRunning ) {
+    unsigned long currentTime;
+    for (int hp = 0; hp < NUMBER_OF_HOLOPROJECTORS; hp++) {
+
+      // -----------------------------------------------------
+      // Set the random delay interval for this holoprojector.
+      // -----------------------------------------------------
+
+      if (m_randomSeconds[hp] == 0) {
+        m_randomSeconds[hp] = random(AUTO_HP_DELAY_MIN, AUTO_HP_DELAY_MAX + 1) * 1000;
+      }
+
+      // --------------------------------------------------------------
+      // Move both horizontal and vertical servos to a random position.
+      // --------------------------------------------------------------
+
+      currentTime = millis();
+      if (currentTime > (m_lastRandomTime[hp] + m_randomSeconds[hp])) {
+        m_lastRandomTime[hp] = currentTime;
+        m_randomSeconds[hp] = 0;
+        m_sendCommand(cmd_HPRandomOn, &MD_Dome_Serial);
+      }
+    }
+  }
 }
 
 // ==================================
@@ -148,7 +147,75 @@ void Marcduino::automation(void)
 // ==================================
 void Marcduino::runCustomPanelSequence(void)
 {
-  
+  /* FUTURE: This function limits each panel to a single, timed 
+   *  opening/closing. I'm not satisfied with that, but have not 
+   *  yet thought through what is needed to run a more complex 
+   *  sequence. */
+
+  #if defined(DEBUG_MARCDUINO) || defined (DEBUG_ALL)
+  output = m_className+F("runCustomPanelSequence()");
+  output += F(" - ");
+  output += F("Running custom routine");
+  printOutput();
+  #endif
+
+  // Initialize local variables.
+
+  String cmd;
+  String xx = "";
+  byte statusTotal = 0;
+
+  // Repeat for each dome panel.
+
+  for (byte i = 0; i < NUMBER_OF_DOME_PANELS; i++) {
+
+    // Prepare the dome panel number for use in the command string.
+    // Left pad with 0 when the number is a single digit.
+
+    if (i < 10) { xx = "0"; }
+    xx += (String)(i+1);
+
+    // Send the 'open dome panel' command.
+
+    if (m_panelState[i].Status == 1) {
+      if ((m_panelState[i].Start + (m_panelState[i].Start_Delay * 1000)) < millis()) {
+        cmd = ":OP"+xx+"\r";
+        m_sendCommand(cmd, &MD_Dome_Serial);
+        m_panelState[i].Status = 2;
+
+        #if defined (DEBUG)
+        output = F("  Opening");
+        output += F(" panel #");
+        output += i+1;
+        printOutput();
+        #endif
+      }
+    }
+
+    // Send the 'close dome panel' command.
+
+    if (m_panelState[i].Status == 2) {
+      if ((m_panelState[i].Start + ((m_panelState[i].Start_Delay + m_panelState[i].Open_Time) * 1000)) < millis()) {
+        cmd = ":CL"+xx+"\r";
+        m_sendCommand(cmd, &MD_Dome_Serial);
+        m_panelState[i].Status = 0;
+
+        #if defined (DEBUG)
+        output = F("  Closing");
+        output += F(" panel #");
+        output += i+1;
+        printOutput();
+        #endif
+      }
+    }
+    statusTotal += m_panelState[i].Status;
+  }
+
+  // If all the panels have now closed - close out the custom routine
+
+  if (statusTotal == 0) {
+    m_customPanelRunning = false;
+  }
 }
 
 // ================================
@@ -169,18 +236,19 @@ void Marcduino::m_sendCommand(byte mapIndex)
   // to the dome master. When not found, do nothing.
   // -----------------------------------------------
 
-  String pgmString = getPgmString(buttonMap[mapIndex].domeCommand);
-  if (pgmString != "") {
-    m_sendCommand(pgmString, &MD_Dome_Serial);
+  String cmdString = getPgmString(buttonMap[mapIndex].domeCommand);
+  if (cmdString != "") {
 
     #ifdef DEBUG
     output = m_className+F("m_sendCommand()");
     output += F(" - ");
     output += F("Send ");
-    output += pgmString;
+    output += cmdString;
     output += F(" to dome master.");
     printOutput();
     #endif
+
+    m_sendCommand(cmdString, &MD_Dome_Serial);
   }
 
   // -----------------------------------------------
@@ -189,18 +257,19 @@ void Marcduino::m_sendCommand(byte mapIndex)
   // -----------------------------------------------
 
   #ifdef MD_BODY_MASTER
-  pgmString = getPgmString(buttonMap[mapIndex].bodyCommand);
-  if (pgmString != "") {
-    m_sendCommand(pgmString, &MD_Body_Serial);
+  cmdString = getPgmString(buttonMap[mapIndex].bodyCommand);
+  if (cmdString != "") {
 
     #ifdef DEBUG
     output = m_className+F("m_sendCommand()");
     output += F(" - ");
     output += F("Send ");
-    output += pgmString;
+    output += cmdString;
     output += F(" to body master.");
     printOutput();
     #endif
+
+    m_sendCommand(cmdString, &MD_Body_Serial);
   }
   #endif
 }
@@ -212,20 +281,35 @@ void Marcduino::m_sendCommand(String inStr, HardwareSerial * targetSerial)
   // --------------------------------------------------------------
 
   #if defined(FEATHER_RADIO)
+  
+  if (targetSerial == MD_Dome_Serial) {
 
-  if (targetSerial == MD_Body_Serial) {
-    targetSerial.print(inStr);
-  } else {
     // Send one character at a time to the Feather Radio.
     for (int i=0; i<inStr.length(); i++) {
       targetSerial.write(inStr[i]);
     }
+
+    #ifdef DEBUG
+    output = m_className+F("m_sendCommand()");
+    output += F(" - ");
+    output += F("Sent via ");
+    output += F("Feather Radio.");
+    printOutput();
+    #endif
+
+    return;
   }
 
-  #else
+  #endif
 
   targetSerial->print(inStr);
 
+  #ifdef DEBUG
+  output = m_className+F("m_sendCommand()");
+  output += F(" - ");
+  output += F("Sent via ");
+  output += F("Serial.");
+  printOutput();
   #endif
 }
 

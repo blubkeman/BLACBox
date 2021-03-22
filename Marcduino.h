@@ -2,7 +2,7 @@
  *    B.L.A.C.Box: Brian Lubkeman's Astromech Controller
  * =================================================================================
  * Peripheral_Marcduino.h - Library for the Marcduino system
- * Created by Brian Lubkeman, 20 February 2021
+ * Created by Brian Lubkeman, 22 March 2021
  * Inspired by S.H.A.D.O.W. controller code written by KnightShade
  * Released into the public domain.
  */
@@ -11,8 +11,10 @@
 
 #include "Controller.h"
 
+#if defined(DEBUG) || defined(TEST_CONTROLLER)
 extern String output;
 extern void printOutput(void);
+#endif
 
 extern String getPgmString(const char *);
 
@@ -36,11 +38,13 @@ typedef struct {
   byte Open_Time;
 } PanelState_Struct;
 
+/*
 typedef struct {
   bool Use;
   int Start_Delay;
   int Open_Time;
 } CustomPanelRoutine_Struct;
+*/
 
 
 /* =========================================================
@@ -54,13 +58,12 @@ class Marcduino {
     #else
     Controller_PS3 * m_controller;
     #endif
-    PanelState_Struct _panelState[NUMBER_OF_DOME_PANELS];
-    CustomPanelRoutine_Struct _myPanels[NUMBER_OF_DOME_PANELS];
-    unsigned long m_randomSeconds[3];
-    unsigned long m_lastRandomTime[3];
-    byte m_mapIndex;
+    int m_buttonIndex;
     bool m_customPanelRunning;
     bool m_holoAutomationRunning;
+    PanelState_Struct m_panelState[NUMBER_OF_DOME_PANELS];
+    unsigned long m_randomSeconds[3];
+    unsigned long m_lastRandomTime[3];
 
     void m_sendCommand(byte);
     void m_sendCommand(String, HardwareSerial *);
@@ -81,7 +84,7 @@ class Marcduino {
     void begin(void);
     void interpretController(void);
     void quietMode(void);
-    void automation(void);
+    void runAutomation(void);
     void runCustomPanelSequence(void);
     bool isCustomPanelRunning(void);
 };
