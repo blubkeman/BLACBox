@@ -2,7 +2,7 @@
  *    B.L.A.C.Box: Brian Lubkeman's Astromech Controller
  * =================================================================================
  * Controller.h - Library for supported controllers
- * Created by Brian Lubkeman, 22 March 2021
+ * Created by Brian Lubkeman, 23 March 2021
  * Inspired by S.H.A.D.O.W. controller code written by KnightShade
  * Released into the public domain.
  */
@@ -62,14 +62,14 @@ class Controller_Parent
     unsigned long mcurrentTime;
     unsigned long m_lagTime;
     unsigned long m_lastReadTime;
-    byte m_onDisconnectCount;
+    byte m_disconnectCount;
 
     #ifdef DEBUG
     String m_className;
     #endif
 
     bool m_authorized(void);
-    void m_setControllerStatus(byte n);
+    void m_setConnectionStatus(byte n);
     void m_initCriticalFault(byte idx);
     void m_resetCriticalFault(byte idx);
 
@@ -92,7 +92,7 @@ class Controller_Parent
 
     void begin(void);
     byte connectionStatus(void);
-    void onDisconnect(void);
+    void continueDisconnecting(void);
     bool duringDisconnect(void);
     int  getButtonsPressed(void);
 

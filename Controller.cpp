@@ -2,7 +2,7 @@
  *    B.L.A.C.Box: Brian Lubkeman's Astromech Controller
  * =================================================================================
  * Controller.cpp - Library for supported controllers
- * Created by Brian Lubkeman, 22 March 2021
+ * Created by Brian Lubkeman, 23 March 2021
  * Inspired by S.H.A.D.O.W. controller code written by KnightShade
  * Released into the public domain.
  */
@@ -22,7 +22,7 @@
 Controller_Parent::Controller_Parent(void) : m_Usb(), m_Btd(&m_Usb)
 {
   m_controllerConnected = NONE;
-  m_onDisconnectCount = 0;
+  m_disconnectCount = 0;
 
   #ifdef DEBUG
   m_className = "Controller_Parent::";
@@ -61,6 +61,40 @@ void Controller_Parent::begin(void)
   output += F("Bluetooth Library Started");
   printOutput();
   #endif
+}
+
+// ============================
+//      connectionStatus()
+// ============================
+byte Controller_Parent::connectionStatus(void)
+{
+  return m_controllerConnected;
+}
+
+// ============================
+//      duringDisconnect()
+// ============================
+bool Controller_Parent::duringDisconnect(void)
+{
+  return (m_disconnectCount > 0 ? true : false);
+}
+
+// =================================
+//      continueDisconnecting()
+// =================================
+void Controller_Parent::continueDisconnecting(void)
+{
+  // ----------------------------------------------------------------------------------
+  // In loop(), each peripheral is given an opportunity to act on the disconnect event.
+  // This function tracks how many peripherals have acted, and resets the count after
+  // all have done so.
+  // ----------------------------------------------------------------------------------
+
+  if ( m_disconnectCount > NUMBER_OF_PERIPHERALS ) {
+    m_disconnectCount = 0;
+    return;
+  }
+  m_disconnectCount++;
 }
 
 // ========================
@@ -114,20 +148,20 @@ bool Controller_Parent::m_authorized(void)
 }
 
 // =================================
-//      m_setControllerStatus()
+//      m_setConnectionStatus()
 // =================================
-void Controller_Parent::m_setControllerStatus(byte status)
+void Controller_Parent::m_setConnectionStatus(byte status)
 {
   // -----------------------------------------------------------------------
   // Input: NONE (0), HALF (1) or FULL (2)
-  // When we lose the controller, start the onDisconnect counter.
+  // When we lose the controller, start the continueDisconnecting counter.
   // In loop(), each peripheral will be given a chance to act on this event.
   // -----------------------------------------------------------------------
   
-  m_controllerConnected = status;  
-  if ( m_controllerConnected != NONE ) {
-    m_onDisconnectCount = 1;
+  if ( m_controllerConnected != NONE && status == NONE ) {
+    m_disconnectCount = 1;
   }
+  m_controllerConnected = status;  
 }
 
 // ===============================
@@ -323,40 +357,6 @@ bool Controller_Parent::m_detectCriticalFault(void)
   }
 
   return false;
-}
-
-// ============================
-//      connectionStatus()
-// ============================
-byte Controller_Parent::connectionStatus(void)
-{
-  return m_controllerConnected;
-}
-
-// ========================
-//      onDisconnect()
-// ========================
-void Controller_Parent::onDisconnect(void)
-{
-  // ----------------------------------------------------------------------------------
-  // In loop(), each peripheral is given an opportunity to act on the disconnect event.
-  // This function tracks how many peripherals have acted, and resets the count after
-  // all have done so.
-  // ----------------------------------------------------------------------------------
-
-  if ( m_onDisconnectCount >= NUMBER_OF_PERIPHERALS ) {
-    m_onDisconnectCount = 0;
-    return;
-  }
-  m_onDisconnectCount++;
-}
-
-// ============================
-//      duringDisconnect()
-// ============================
-bool Controller_Parent::duringDisconnect(void)
-{
-  return (m_onDisconnectCount > 0 ? true : false);
 }
 
 

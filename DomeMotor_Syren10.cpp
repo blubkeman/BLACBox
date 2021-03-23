@@ -2,7 +2,7 @@
  *    B.L.A.C.Box: Brian Lubkeman's Astromech Controller
  * =================================================================================
  * DomeMotor_Syren10.cpp - Library for the Syren10 dome motor controller
- * Created by Brian Lubkeman, 22 March 2021
+ * Created by Brian Lubkeman, 23 March 2021
  * Inspired by S.H.A.D.O.W. controller code written by KnightShade
  * Released into the public domain.
  */
@@ -25,6 +25,8 @@
 // 131 = 4,5 down; 6 up   135 = 4,5,6 all down
 
 const int SYREN_ADDR = 129;  // Serial Address for Dome Syren
+
+const int SYREN_BAUD_RATE = 9600;  // Do not change this!
 
 
 // =====================
@@ -67,7 +69,7 @@ void Syren10_DomeMotor::begin(void)
   // Start communication with the Syren10.
   // -------------------------------------
 
-  DomeMotorSerial.begin(9600);
+  DomeMotorSerial.begin(SYREN_BAUD_RATE);
   m_syren.setTimeout(300);
   m_syren.stop();
 

@@ -2,7 +2,7 @@
  *    B.L.A.C.Box: Brian Lubkeman's Astromech Controller
  * =================================================================================
  * Peripheral_Marcduino.cpp - Library for the Marcduino system
- * Created by Brian Lubkeman, 22 March 2021
+ * Created by Brian Lubkeman, 23 March 2021
  * Inspired by S.H.A.D.O.W. controller code written by KnightShade
  * Released into the public domain.
  */
@@ -45,6 +45,13 @@ Marcduino::Marcduino(Controller_PS3 * pController)
 // =================
 void Marcduino::begin()
 {
+  // Start the Serial communication.
+
+  MD_Dome_Serial.begin(MARCDUINO_BAUD_RATE);
+  #if defined(MD_BODY_MASTER)
+  MD_Body_Serial.begin(MARCDUINO_BAUD_RATE);
+  #endif
+
   #ifdef DEBUG
   output = m_className+F("begin()");
   output += F(" - ");
@@ -63,6 +70,12 @@ void Marcduino::interpretController(void)
   // ---------------------------------------
 
   if ( m_controller->connectionStatus() == NONE ) {
+    #ifdef DEBUG
+    output = m_className+F("interpretController()");
+    output += F(" - ");
+    output += F("No controller");
+    printOutput();
+    #endif
     return;
   }
 
@@ -96,14 +109,14 @@ void Marcduino::interpretController(void)
 void Marcduino::quietMode(void)
 {
   #if defined(MD_BODY_MASTER)
-  m_sendCommand(cmd_DomeQuiet, &MD_Dome_Serial);
+  m_sendCommand(getPgmString(cmd_DomeQuiet), &MD_Dome_Serial);
     #if defined(MD_BODY_SOUND)
-    m_sendCommand(cmd_BodyQuiet, &MD_Body_Serial);
+    m_sendCommand(getPgmString(cmd_BodyQuiet), &MD_Body_Serial);
     #else
-    m_sendCommand(cmd_ClosePanelAll, &MD_Body_Serial);
+    m_sendCommand(getPgmString(cmd_ClosePanelAll), &MD_Body_Serial);
     #endif
   #else
-  m_sendCommand(cmd_QuietMode, &MD_Dome_Serial);
+  m_sendCommand(getPgmString(cmd_QuietMode), &MD_Dome_Serial);
   #endif
 }
 
@@ -231,50 +244,26 @@ bool Marcduino::isCustomPanelRunning(void)
 // =========================
 void Marcduino::m_sendCommand(byte mapIndex)
 {
-  // -----------------------------------------------
-  // Lookup the dome command. When found, send it
-  // to the dome master. When not found, do nothing.
-  // -----------------------------------------------
+  // ------------------------------------
+  // Lookup the dome command and send it.
+  // ------------------------------------
 
-  String cmdString = getPgmString(buttonMap[mapIndex].domeCommand);
-  if (cmdString != "") {
+  m_sendCommand(getPgmString(buttonMap[mapIndex].domeCommand), &MD_Dome_Serial);
 
-    #ifdef DEBUG
-    output = m_className+F("m_sendCommand()");
-    output += F(" - ");
-    output += F("Send ");
-    output += cmdString;
-    output += F(" to dome master.");
-    printOutput();
-    #endif
-
-    m_sendCommand(cmdString, &MD_Dome_Serial);
-  }
-
-  // -----------------------------------------------
-  // Lookup the body command. When found, send it
-  // to the body master. When not found, do nothing.
-  // -----------------------------------------------
+  // ------------------------------------
+  // Lookup the body command and send it.
+  // ------------------------------------
 
   #ifdef MD_BODY_MASTER
-  cmdString = getPgmString(buttonMap[mapIndex].bodyCommand);
-  if (cmdString != "") {
-
-    #ifdef DEBUG
-    output = m_className+F("m_sendCommand()");
-    output += F(" - ");
-    output += F("Send ");
-    output += cmdString;
-    output += F(" to body master.");
-    printOutput();
-    #endif
-
-    m_sendCommand(cmdString, &MD_Body_Serial);
-  }
+  m_sendCommand(getPgmString(buttonMap[mapIndex].bodyCommand), &MD_Body_Serial);
   #endif
 }
 void Marcduino::m_sendCommand(String inStr, HardwareSerial * targetSerial)
 {
+  if ( inStr == "" ) {
+    return;
+  }
+  
   // --------------------------------------------------------------
   // This function allows for the use of either a slip ring (wired)
   //  or a Feather Radio (wireless) connection to the dome.
@@ -292,8 +281,9 @@ void Marcduino::m_sendCommand(String inStr, HardwareSerial * targetSerial)
     #ifdef DEBUG
     output = m_className+F("m_sendCommand()");
     output += F(" - ");
-    output += F("Sent via ");
-    output += F("Feather Radio.");
+    output += F("Sent ");
+    output += inStr;
+    output += F(" to dome via Feather Radio.");
     printOutput();
     #endif
 
@@ -307,8 +297,14 @@ void Marcduino::m_sendCommand(String inStr, HardwareSerial * targetSerial)
   #ifdef DEBUG
   output = m_className+F("m_sendCommand()");
   output += F(" - ");
-  output += F("Sent via ");
-  output += F("Serial.");
+  output += F("Sent ");
+  output += inStr;
+  if ( targetSerial == &MD_Dome_Serial ) {
+    output += F(" to dome");
+  } else if ( targetSerial == &MD_Body_Serial ) {
+    output += F(" to body");
+  }
+  output += F(" via Serial.");
   printOutput();
   #endif
 }

@@ -2,7 +2,7 @@
  *    B.L.A.C.Box: Brian Lubkeman's Astromech Controller
  * =================================================================================
  * Controller_PS3Nav.cpp - Library for PS3 Move Navigation controllers
- * Created by Brian Lubkeman, 22 March 2021
+ * Created by Brian Lubkeman, 23 March 2021
  * Inspired by S.H.A.D.O.W. controller code written by KnightShade
  * Released into the public domain.
  */
@@ -167,9 +167,9 @@ void Controller_PS3Nav::m_connect(PS3BT * pController)
 
   pController->setLedOn(LED1);
   if ( pController == &m_controller ) {
-    m_setControllerStatus(HALF);
+    m_setConnectionStatus(HALF);
   } else if ( pController == &m_secondController ) {
-    m_setControllerStatus(FULL);
+    m_setConnectionStatus(FULL);
   }
 }
 
@@ -198,9 +198,9 @@ void Controller_PS3Nav::m_disconnect(PS3BT * pController)
   // -----------------------------
 
   if ( pController == &m_controller ) {
-    m_setControllerStatus(NONE);
+    m_setConnectionStatus(NONE);
   } else if ( pController == &m_secondController ) {
-    m_setControllerStatus(HALF);
+    m_setConnectionStatus(HALF);
   }
 
   // ----------
@@ -257,7 +257,7 @@ bool Controller_PS3Nav::read()
 
   m_Usb.Task();
   if ( ! connected(&m_controller) ) {
-    // _onDisconnect();
+    // _continueDisconnecting();
     return false;
   } else {
     if ( m_detectCriticalFault(&m_controller) ) {

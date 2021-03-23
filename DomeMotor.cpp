@@ -2,7 +2,7 @@
  *    B.L.A.C.Box: Brian Lubkeman's Astromech Controller
  * =================================================================================
  * DomeMotor.cpp - Library for supported dome motor controllers
- * Created by Brian Lubkeman, 22 March 2021
+ * Created by Brian Lubkeman, 23 March 2021
  * Inspired by S.H.A.D.O.W. controller code written by KnightShade
  * Released into the public domain.
  */
@@ -87,28 +87,36 @@ void DomeMotor::begin()
 // ===============================
 void DomeMotor::interpretController(void)
 {
-  // -------------------------------------------
-  // When no controller is found stop the motor.
-  // -------------------------------------------
-
-  if ( m_controller->connectionStatus() == NONE ) {
-    return;
-  }
-
-  // ----------------------------------------
-  // Look for dome automation enable/disable.
-  // ----------------------------------------
-
 /* ===============================================
- *  Enable/Disable commands
- * ===============================================
  *
  *                            PS3 Navigation    PS3/PS4 Controller
  *                            ==============    ==================
  *  Enable dome automation    L2+Circle         L2+Share
  *  Disable dome automation   L2+Cross          L2+Options
  *
- * =============================================== */
+ *                            Dual PS3 Navs     Single PS3 Nav
+ *                            ===============   ==================
+ *  Manual dome rotation      Secondary stick   L2 + primary stick
+ *
+ * =============================================== */  
+
+  // -------------------------------------------
+  // When no controller is found stop the motor.
+  // -------------------------------------------
+
+  if ( m_controller->connectionStatus() == NONE ) {
+    #ifdef DEBUG
+    output = m_className+F("interpretController()");
+    output += F(" - ");
+    output += F("No controller");
+    printOutput();
+    #endif
+    return;
+  }
+
+  // ----------------------------------------
+  // Look for dome automation enable/disable.
+  // ----------------------------------------
 
   if ( m_controller->getButtonPress(L2) ) {
 
@@ -156,15 +164,6 @@ void DomeMotor::interpretController(void)
 
   #if defined(PS3_NAVIGATION)
 
-  /* ===============================================
-   * 
-   *          Dual PS3 Navs   Single PS3 Nav
-   *          --------------  ------------------
-   * Drive    Primary stick   Primary stick
-   * Dome     Optional stick  L2 + Primary stick
-   *
-   * =============================================== */
-  
   if ( m_controller->connectionStatus() == HALF ) {
     if ( ! m_controller->getButtonPress(L2) ) {
       return;
@@ -328,13 +327,13 @@ void DomeMotor::m_automationInit(void)
     // Previous position was home. Set a new position.
     // -----------------------------------------------
 
-    m_targetPosition = random(5,354);
     m_startTurnTime = currentTime + (random(3, 11) * 1000); // Wait 3-10 seconds before turning.
+    m_targetPosition = random(5,354);
     if ( m_targetPosition < 180 ) {
-      m_stopTurnTime = m_startTurnTime + ((m_targetPosition / 360) * TIME_360_DOME_TURN);
+      m_stopTurnTime = m_startTurnTime + ((int)m_targetPosition / (float)360.0 * (unsigned long)TIME_360_DOME_TURN);
       m_turnDirection = 1;
     } else {
-      m_stopTurnTime = m_startTurnTime + (((360 - m_targetPosition) / 360) * TIME_360_DOME_TURN);
+      m_stopTurnTime = m_startTurnTime + (((float)360.0 - (int)m_targetPosition) / (float)360.0 * (unsigned long)TIME_360_DOME_TURN);
       m_turnDirection = -1;
     }
 
@@ -346,11 +345,11 @@ void DomeMotor::m_automationInit(void)
 
     m_startTurnTime = currentTime + (random(1,6) * 1000); // Wait 1-5 seconds before returning home.
     if ( m_targetPosition < 180 ) {
-      m_stopTurnTime = m_startTurnTime + ((m_targetPosition / 360) * TIME_360_DOME_TURN);
+      m_stopTurnTime = m_startTurnTime + ((int)m_targetPosition / (float)360.0 * (unsigned long)TIME_360_DOME_TURN);
     } else {
-      m_stopTurnTime = m_startTurnTime + (((360 - m_targetPosition) / 360) * TIME_360_DOME_TURN);
+      m_stopTurnTime = m_startTurnTime + (((float)360 - (int)m_targetPosition) / (float)360.0 * (unsigned long)TIME_360_DOME_TURN);
     }
-    m_turnDirection = m_turnDirection * -1;
+    m_turnDirection *= -1;
     m_targetPosition = 0;
   }
 
@@ -369,10 +368,10 @@ void DomeMotor::m_automationInit(void)
   output += F(" - ");
   output += F("Turn set");
   output += F("\n");
-  output += F("  Current time: ");    output += currentTime;      output += F("\n");
-  output += F("  Next Start time: "); output += m_startTurnTime;  output += F("\n");
-  output += F("  Next Stop time: ");  output += m_stopTurnTime;   output += F("\n");
-  output += F("  Target position: "); output += m_targetPosition;
+  output += F("  Current time: ");    output += currentTime;        output += F("\n");
+  output += F("  Target position: "); output += m_targetPosition;   output += F("\n");
+  output += F("  Next start time: "); output += m_startTurnTime;    output += F("\n");
+  output += F("  Next stop time:  "); output += m_stopTurnTime;
   printOutput();
   #endif
 }
