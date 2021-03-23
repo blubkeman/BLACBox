@@ -2,7 +2,7 @@
  *    B.L.A.C.Box: Brian Lubkeman's Astromech Controller
  * =================================================================================
  * Controller_PS4.cpp - Library for PS4 controllers
- * Created by Brian Lubkeman, 22 March 2021
+ * Created by Brian Lubkeman, 23 March 2021
  * Inspired by S.H.A.D.O.W. controller code written by KnightShade
  * Released into the public domain.
  */
@@ -119,7 +119,7 @@ void Controller_PS4::m_connect(void)
   // --------------------
 
   setLed();
-  m_setControllerStatus(FULL);
+  m_setConnectionStatus(FULL);
 
   // ----------
   // Debugging.
@@ -143,7 +143,7 @@ void Controller_PS4::m_disconnect(void)
 {
   m_controller.setLedOff();
   m_controller.disconnect();
-  m_setControllerStatus(NONE);
+  m_setConnectionStatus(NONE);
 
   #ifdef DEBUG
   output = m_className+F("m_disconnect()");

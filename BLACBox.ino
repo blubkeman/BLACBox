@@ -1,7 +1,7 @@
 /* =================================================================================
  *    B.L.A.C.Box: Brian Lubkeman's Astromech Controller
  * =================================================================================
- *                          Last Revised Date: 22 March 2021
+ *                          Last Revised Date: 23 March 2021
  *                          Revised By: Brian E. Lubkeman
  *  Inspired by the PADAWAN (danf), SHADOW (KnightShade), SHADOW_MD (vint43) effort
  * =================================================================================
@@ -175,48 +175,44 @@ void loop() {
   /* ========================
    *      DRIVE/STEERING
    * ======================== */
-  if ( controller.read() ) {
+  if ( controller.duringDisconnect() ) {
+    // Stop the drive motors when we lose the controller.
+    Serial.println("Disconnecting drive.");
+    driveMotor.stop();
+    controller.continueDisconnecting();
+  } else if ( controller.read() ) {
     driveMotor.interpretController();
-  }
-    else {
-    // Bad read. Stop the motor when we lose the controller.
-    if ( controller.duringDisconnect() ) {
-      driveMotor.stop();
-      controller.onDisconnect();
-    }
   }
 
   /* =======================
    *      DOME ROTATION
    * ======================= */
-  if ( controller.read() ) {
+  if ( controller.duringDisconnect() ) {
+    // Stop the dome motor when we lose the controller.
+    Serial.println("Disconnecting dome.");
+    domeMotor.stop();
+    controller.continueDisconnecting();
+  } else if ( controller.read() ) {
     domeMotor.interpretController();
-    if ( domeMotor.isAutomationRunning() )
+    if ( domeMotor.isAutomationRunning() ) {
       domeMotor.runAutomation();
-  } else {
-    // Bad read. Stop the motor when we lose the controller.
-    if ( controller.duringDisconnect() ) {
-      domeMotor.stop();
-      controller.onDisconnect();
     }
   }
 
   /* ===========================
    *          MARCDUINO
    * =========================== */
-  if ( controller.read() ) {
+  if ( controller.duringDisconnect() ) {
+    // Put Marcduino into Quiet mode when we lose the controller.
+    Serial.println("Disconnecting Marcduino.");
+    marcduino.quietMode();
+    controller.continueDisconnecting();
+  } else if ( controller.read() ) {
     marcduino.interpretController();
     if ( marcduino.isCustomPanelRunning() ) {
       marcduino.runCustomPanelSequence();
     }
     marcduino.runAutomation();
-  } else {
-    // Bad read.
-    // Put Marcduino into Quiet mode when we lose the controller.
-    if ( controller.duringDisconnect() ) {
-      marcduino.quietMode();
-      controller.onDisconnect();
-    }
   }
 }
 

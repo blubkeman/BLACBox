@@ -2,7 +2,7 @@
  *    B.L.A.C.Box: Brian Lubkeman's Astromech Controller
  * =================================================================================
  * Settings.h - Library for user settings
- * Created by Brian Lubkeman, 22 March 2021
+ * Created by Brian Lubkeman, 23 March 2021
  * Inspired by S.H.A.D.O.W. controller code written by KnightShade
  * Released into the public domain.
  */
@@ -75,9 +75,9 @@ const byte DRIVE_STICK = 0;     // This is the left stick (or PS3 Nav primary st
 
 const byte DOME_SPEED = 100;              // If using a speed controller for the dome, this sets the top speed
                                           // Use a number up to 127 for serial.
-const int TIME_360_DOME_TURN = 4000;      // Milliseconds for dome to complete 360 turn at DOME_AUTO_SPEED
-const int TIME_360_DOME_TURN_MIN = 1999;  // Minimum time allowed for dome to complete a full 360 turn.
-const int TIME_360_DOME_TURN_MAX = 8001;  // Maximum time allowed for dome to complete a full 360 turn.
+const unsigned long TIME_360_DOME_TURN = 2000;      // Milliseconds for dome to complete 360 turn at DOME_AUTO_SPEED
+const unsigned long TIME_360_DOME_TURN_MIN = 1999;  // Minimum time allowed for dome to complete a full 360 turn.
+const unsigned long TIME_360_DOME_TURN_MAX = 8001;  // Maximum time allowed for dome to complete a full 360 turn.
                                           // Cut in half to reduce spin.  Offset for different rotation startups due to gearing.
 const byte DOME_AUTO_SPEED = 100;         // Speed used when dome automation is active (1-127)
 const byte DOME_AUTO_SPEED_MIN = 49;      // Minimum auto dome speed to allow automation to run.
