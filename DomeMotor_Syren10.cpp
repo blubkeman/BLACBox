@@ -32,7 +32,9 @@ const int SYREN_BAUD_RATE = 9600;  // Do not change this!
 // =====================
 //      Constructor
 // =====================
-#if defined(PS4_CONTROLLER)
+#if defined(PS5_CONTROLLER)
+Syren10_DomeMotor::Syren10_DomeMotor(Controller_PS5 * pController) : DomeMotor(), m_syren(SYREN_ADDR, DomeMotorSerial)
+#elif defined(PS4_CONTROLLER)
 Syren10_DomeMotor::Syren10_DomeMotor(Controller_PS4 * pController) : DomeMotor(), m_syren(SYREN_ADDR, DomeMotorSerial)
 #else
 Syren10_DomeMotor::Syren10_DomeMotor(Controller_PS3 * pController) : DomeMotor(), m_syren(SYREN_ADDR, DomeMotorSerial)
@@ -91,24 +93,11 @@ void Syren10_DomeMotor::begin(void)
 // ================
 void Syren10_DomeMotor::stop(void)
 {
-  // --------------------------------------------------
-  // When the motor is already not running, do nothing.
-  // --------------------------------------------------
-
   if ( domeStopped ) {
     return;
   }
 
-  // ----------------------
-  // Send the stop command.
-  // ----------------------
-
   m_syren.stop();
-
-  // -----------------------------
-  // Update the dome motor status.
-  // -----------------------------
-
   domeStopped = true;
 
   // ----------
@@ -128,16 +117,7 @@ void Syren10_DomeMotor::stop(void)
 // ========================
 void Syren10_DomeMotor::m_rotateDome(int rotationSpeed)
 {
-  // ------------------------
-  // Send the rotate command.
-  // ------------------------
-
   m_syren.motor(rotationSpeed);
-
-  // -----------------------------
-  // Update the dome motor status.
-  // -----------------------------
-
   domeStopped = false;
 
   // ----------

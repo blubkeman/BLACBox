@@ -24,6 +24,7 @@
 // Uncomment one of the following lines that represent
 // which type of controller you will be using.
 
+//#define PS5_CONTROLLER
 #define PS4_CONTROLLER
 //#define PS3_CONTROLLER
 //#define PS3_NAVIGATION
@@ -102,9 +103,13 @@ const byte DOME_AUTO_SPEED_MAX = 101;     // Maximum auto dome speed to allow au
 
 #endif
 
+#define MP3_TRIGGER       // Uncomment this line if your sound system uses a Sparkfun MP3 Trigger
+//#define CF_III            // Uncomment this line if your sound system uses a CF III.
+
 //#define MAGIC_PANEL     // Uncomment this line if your dome includes a magic panel.
 
-const byte NUMBER_OF_DOME_PANELS = 10;   // Specify how many dome panels are in use.
+const byte NUMBER_OF_BODY_PANELS = 2;    // Specify how many body panels are in use. max = 10
+const byte NUMBER_OF_DOME_PANELS = 10;   // Specify how many dome panels are in use. max = 10
 const byte NUMBER_OF_HOLOPROJECTORS = 3; // Specify how many holoprojectors are in use.
 const byte AUTO_HP_DELAY_MIN = 2;        // Specify in seconds. Minimum time between automated holoprojector movements.
 const byte AUTO_HP_DELAY_MAX = 10;       // Specify in seconds. Maximum time between automated holoprojector movements.

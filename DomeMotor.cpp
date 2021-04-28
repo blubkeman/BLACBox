@@ -54,9 +54,9 @@ void DomeMotor::begin()
 
   randomSeed(analogRead(0));
 
-  // ==================================
+  // ----------------------------------
   // Validate dome automation settings.
-  // ==================================
+  // ----------------------------------
 
   if ( TIME_360_DOME_TURN < TIME_360_DOME_TURN_MIN ||
        TIME_360_DOME_TURN > TIME_360_DOME_TURN_MAX ||
@@ -89,10 +89,10 @@ void DomeMotor::interpretController(void)
 {
 /* ===============================================
  *
- *                            PS3 Navigation    PS3/PS4 Controller
- *                            ==============    ==================
- *  Enable dome automation    L2+Circle         L2+Share
- *  Disable dome automation   L2+Cross          L2+Options
+ *                            PS3 Navigation    PS3|PS4|PS5 Controller
+ *                            ==============    ======================
+ *  Enable dome automation    L2+Circle         L2+Select|Share|Create
+ *  Disable dome automation   L2+Cross          L2+Start|Options
  *
  *                            Dual PS3 Navs     Single PS3 Nav
  *                            ===============   ==================
@@ -122,7 +122,9 @@ void DomeMotor::interpretController(void)
 
     if ( isAutomationRunning() ) {
 
-      #if defined(PS4_CONTROLLER)
+      #if defined(PS5_CONTROLLER)
+      if ( m_controller->getButtonClick(CREATE) ) {
+      #elif defined(PS4_CONTROLLER)
       if ( m_controller->getButtonClick(SHARE) ) {
       #else
       if ( m_controller->getButtonClick(SELECT) ) {
@@ -132,7 +134,7 @@ void DomeMotor::interpretController(void)
 
     } else {
 
-      #if defined(PS4_CONTROLLER)
+      #if defined(PS4_CONTROLLER) || defined(PS5_CONTROLLER)
       if ( m_controller->getButtonClick(OPTIONS) ) { 
       #else
       if ( m_controller->getButtonClick(START) ) { 
@@ -179,7 +181,7 @@ void DomeMotor::interpretController(void)
 
   /* ===============================================
    * 
-   *          PS3 or PS4       PS3 or PS4
+   *          PS3,PS4,PS5      PS3,PS4,PS5
    *          -----------  or  ------------------
    * Drive    Left stick       Right stick
    * Dome     Right stick      Left stick
@@ -285,9 +287,9 @@ void DomeMotor::m_automationOff(void)
 }
 
 // =========================
-//      runAutomation()
+//      runHoloAutomation()
 // =========================
-void DomeMotor::runAutomation(void)
+void DomeMotor::runHoloAutomation(void)
 {
   // ----------------------------------------------
   // Do not run automation if settings are invalid.

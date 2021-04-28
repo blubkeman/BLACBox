@@ -11,6 +11,7 @@
 
 #include <usbhub.h>
 #include <BTD.h>
+#include <PS5BT.h>
 #include <PS4BT.h>
 #include <PS3BT.h>
 #include "Settings.h"
@@ -52,7 +53,7 @@ const byte NUMBER_OF_CONTROLLERS = 1;
 /* ================================================================================
  *                             Parent Controller Class
  * ================================================================================ */
-class Controller_Parent
+class Controller_Wrapper
 {
   protected:
     USB m_Usb;
@@ -87,8 +88,8 @@ class Controller_Parent
     #endif
 
   public:
-    Controller_Parent(void);
-    virtual ~Controller_Parent(void);
+    Controller_Wrapper(void);
+    virtual ~Controller_Wrapper(void);
 
     void begin(void);
     byte connectionStatus(void);
@@ -110,7 +111,7 @@ class Controller_Parent
 /* ================================================================================
  *                                  PS4 Controller
  * ================================================================================ */
-class Controller_PS4 : public Controller_Parent
+class Controller_PS4 : public Controller_Wrapper
 {
   private:
     PS4BT m_controller;
@@ -144,7 +145,7 @@ class Controller_PS4 : public Controller_Parent
 /* ================================================================================
  *                                  PS3 Controller
  * ================================================================================ */
-class Controller_PS3 : public Controller_Parent
+class Controller_PS3 : public Controller_Wrapper
 {
   private:
     PS3BT m_controller;
@@ -179,7 +180,7 @@ class Controller_PS3 : public Controller_Parent
 /* ================================================================================
  *                             PS3 Navigation Controller
  * ================================================================================ */
-class Controller_PS3Nav : public Controller_Parent
+class Controller_PS3Nav : public Controller_Wrapper
 {
   private:
     PS3BT m_controller;
@@ -200,6 +201,40 @@ class Controller_PS3Nav : public Controller_Parent
 
     Controller_PS3Nav(void);
     virtual ~Controller_PS3Nav(void);
+    void begin(void);
+
+    virtual bool read(void);
+    virtual void setLed(void);
+    virtual bool getButtonClick(int buttonEnum);
+    virtual bool getButtonPress(int buttonEnum);
+    virtual int  getAnalogButton(int buttonEnum);
+    virtual int  getAnalogHat(int stickEnum);
+};
+#endif
+
+
+#if defined(PS5_CONTROLLER)
+/* ================================================================================
+ *                                  PS5 Controller
+ * ================================================================================ */
+class Controller_PS5 : public Controller_Wrapper
+{
+  private:
+    PS5BT m_controller;
+
+    static void m_onInit(void);
+
+    virtual void m_connect(void);
+    virtual void m_disconnect(void);
+    virtual bool m_getUsbStatus(void);
+    virtual bool connected(void);
+    virtual int  m_getModifierButtons(void);
+
+  public:
+    static Controller_PS5 * Controller_PS5::anchor;
+
+    Controller_PS5(void);
+    virtual ~Controller_PS5(void);
     void begin(void);
 
     virtual bool read(void);

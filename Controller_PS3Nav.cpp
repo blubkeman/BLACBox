@@ -18,7 +18,7 @@
 // =====================
 //      Constructor
 // =====================
-Controller_PS3Nav::Controller_PS3Nav(void) : Controller_Parent(), m_controller(&m_Btd), m_secondController(&m_Btd)
+Controller_PS3Nav::Controller_PS3Nav(void) : Controller_Wrapper(), m_controller(&m_Btd), m_secondController(&m_Btd)
 {
   #ifdef DEBUG
   m_className = "Controller_PS3Nav::";
@@ -39,7 +39,7 @@ void Controller_PS3Nav::begin(void)
   // Call the parent class begin() to start the USB Host Shield.
   // -----------------------------------------------------------
 
-  Controller_Parent::begin();
+  Controller_Wrapper::begin();
 
   // ------------------------
   // Set up the onInit event.

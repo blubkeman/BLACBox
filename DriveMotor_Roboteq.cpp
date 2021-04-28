@@ -22,7 +22,9 @@ const int ROBOTEQ_BAUD_RATE = 115200;     // I strongly recommend not changing t
 // =====================
 //      Constructor
 // =====================
-#if defined(PS4_CONTROLLER)
+#if defined(PS5_CONTROLLER)
+Roboteq_DriveMotor::Roboteq_DriveMotor(Controller_PS5 * pController) : DriveMotor()
+#elif defined(PS4_CONTROLLER)
 Roboteq_DriveMotor::Roboteq_DriveMotor(Controller_PS4 * pController) : DriveMotor()
 #else
 Roboteq_DriveMotor::Roboteq_DriveMotor(Controller_PS3 * pController) : DriveMotor()

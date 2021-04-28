@@ -1,7 +1,7 @@
 /* =================================================================================
  *    B.L.A.C.Box: Brian Lubkeman's Astromech Controller
  * =================================================================================
- * Controller_PS4.cpp - Library for PS4 controllers
+ * Controller_PS5.cpp - Library for PS5 controllers
  * Created by Brian Lubkeman, 23 March 2021
  * Inspired by S.H.A.D.O.W. controller code written by KnightShade
  * Released into the public domain.
@@ -10,31 +10,31 @@
 #include "Controller.h"
 
 
-#if defined(PS4_CONTROLLER)
+#if defined(PS5_CONTROLLER)
 /* ================================================================================
- *                                  PS4 Controller
+ *                                  PS5 Controller
  * ================================================================================ */
 
 
 // =====================
 //      Constructor
 // =====================
-Controller_PS4::Controller_PS4(void) : Controller_Wrapper(), m_controller(&m_Btd)
+Controller_PS5::Controller_PS5(void) : Controller_Wrapper(), m_controller(&m_Btd)
 {
   #ifdef DEBUG
-  m_className = "Controller_PS4::";
+  m_className = "Controller_PS5::";
   #endif
 }
 
 // ====================
 //      Destructor
 // ====================
-Controller_PS4::~Controller_PS4(void) {}
+Controller_PS5::~Controller_PS5(void) {}
 
 // =================
 //      begin()
 // =================
-void Controller_PS4::begin(void)
+void Controller_PS5::begin(void)
 {
   // -----------------------------------------------------------
   // Call the parent class begin() to start the USB Host Shield.
@@ -57,7 +57,7 @@ void Controller_PS4::begin(void)
   output = m_className+F("begin()");
   output += F(" - ");
   output += F("Ready to connect a");
-  output += F(" PS4");
+  output += F(" PS5");
   output += F(" controller");
   printOutput();
   #endif
@@ -66,7 +66,7 @@ void Controller_PS4::begin(void)
 // ====================
 //      m_onInit()
 // ====================
-static void Controller_PS4::m_onInit(void)
+static void Controller_PS5::m_onInit(void)
 {
   if (anchor != NULL) {
     anchor->m_connect();
@@ -76,7 +76,7 @@ static void Controller_PS4::m_onInit(void)
 // ===================
 //      m_connect
 // ===================
-void Controller_PS4::m_connect(void)
+void Controller_PS5::m_connect(void)
 {
   // --------------------------------------------------------------
   // First, let's make sure we have a controller.  If not, drop it.
@@ -97,7 +97,7 @@ void Controller_PS4::m_connect(void)
   }
 
   // --------------------------------------------------------------------------------
-  // Somehow, the USB Host Shield calls onInit twice per connection for the PS4 only.
+  // Somehow, the USB Host Shield calls onInit twice per connection for the PS5 only.
   // The following use of connectionStatus() helps us process this content only once.
   // --------------------------------------------------------------------------------
 
@@ -131,9 +131,6 @@ void Controller_PS4::m_connect(void)
     output += F(" - ");
     output += F("Controller");
     output += F(" connected");
-    output += F("\nBattery: ");
-    output += (int)(m_controller.getBatteryLevel()/15)*100;
-    output += F("%");
     printOutput();
   }
   #endif
@@ -142,7 +139,7 @@ void Controller_PS4::m_connect(void)
 // ========================
 //      m_disconnect()
 // ========================
-void Controller_PS4::m_disconnect(void)
+void Controller_PS5::m_disconnect(void)
 {
   m_controller.setLedOff();
   m_controller.disconnect();
@@ -159,7 +156,7 @@ void Controller_PS4::m_disconnect(void)
 // ==================
 //      setLed()
 // ==================
-void Controller_PS4::setLed(void)
+void Controller_PS5::setLed(void)
 {
   if ( ! driveEnabled ) {
     m_controller.setLed(Red);
@@ -188,15 +185,15 @@ void Controller_PS4::setLed(void)
 // ==========================
 //      m_getUsbStatus()
 // ==========================
-bool Controller_PS4::m_getUsbStatus(void)
+bool Controller_PS5::m_getUsbStatus(void)
 {
-  return m_controller.getUsbStatus();
+  return true;
 }
 
 // =====================
 //      m_connected
 // =====================
-bool Controller_PS4::connected(void)
+bool Controller_PS5::connected(void)
 {
   return m_controller.connected();
 }
@@ -204,7 +201,7 @@ bool Controller_PS4::connected(void)
 // ================
 //      read()
 // ================
-bool Controller_PS4::read()
+bool Controller_PS5::read()
 {
   // ------------------------------
   // Get input from the controller.
@@ -252,17 +249,17 @@ bool Controller_PS4::read()
 // ==============================
 //      Get Button Functions
 // ==============================
-bool Controller_PS4::getButtonClick(int buttonEnum) { return m_controller.getButtonClick(buttonEnum); };
-bool Controller_PS4::getButtonPress(int buttonEnum) { return m_controller.getButtonPress(buttonEnum); };
-int Controller_PS4::getAnalogButton(int buttonEnum) { return m_controller.getAnalogButton(buttonEnum); };
-int Controller_PS4::getAnalogHat(int stickEnum)  { return m_controller.getAnalogHat(stickEnum); }
-int Controller_PS4::m_getModifierButtons(void)
+bool Controller_PS5::getButtonClick(int buttonEnum) { return m_controller.getButtonClick(buttonEnum); };
+bool Controller_PS5::getButtonPress(int buttonEnum) { return m_controller.getButtonPress(buttonEnum); };
+int Controller_PS5::getAnalogButton(int buttonEnum) { return m_controller.getAnalogButton(buttonEnum); };
+int Controller_PS5::getAnalogHat(int stickEnum)  { return m_controller.getAnalogHat(stickEnum); }
+int Controller_PS5::m_getModifierButtons(void)
 {
   int modifier = 0;
 
   if ( getButtonPress(L1) || 
        getButtonPress(R1) )           { modifier = 8;  }
-  else if ( getButtonPress(SHARE) )   { modifier = 16; }
+  else if ( getButtonPress(CREATE) )  { modifier = 16; }
   else if ( getButtonPress(OPTIONS) ) { modifier = 24; }
   else if ( getButtonPress(PS) )      { modifier = 32; }
 

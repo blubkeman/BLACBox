@@ -157,14 +157,6 @@ void DriveMotor::interpretController(void)
   // ----------------------------------------------------------------
 
   if ( ! m_isDeadmanPressed() ) {
-/*
-    #ifdef DEBUG
-    output = F("DriveMotor::interpretController()");
-    output += F(" - ");
-    output += F("Deadman not pressed");
-    printOutput();
-    #endif
-*/
     stop();
     return;
   }
@@ -252,12 +244,12 @@ void DriveMotor::interpretController(void)
 // ================================
 void DriveMotor::m_updateSpeedProfile(void)
 {
-  #if ( (defined(SBL2360) || defined(SBL1360)) && (defined(PS3_CONTROLLER) || defined(PS4_CONTROLLER)) )
+  #if ( (defined(SBL2360) || defined(SBL1360)) && (defined(PS3_CONTROLLER) || defined(PS4_CONTROLLER) || defined(PS5_CONTROLLER)) )
 
-  // -------------------------------------------------------------------
-  // For PS3 and PS4 controllers using the Roboteq motor controller,
+  // ---------------------------------------------------------------------
+  // For PS3, PS4, and PS5 controllers using the Roboteq motor controller,
   // the full spectrum of speed profiles is available. Cycle through it.
-  // -------------------------------------------------------------------
+  // ---------------------------------------------------------------------
 
   if ( speedProfile == SPRINT ) {
     speedProfile = WALK;
@@ -350,11 +342,11 @@ bool DriveMotor::m_isDeadmanPressed(void)
 
     }
 
-  #elif defined(PS3_CONTROLLER) || defined(PS4_CONTROLLER)
+  #elif defined(PS3_CONTROLLER) || defined(PS4_CONTROLLER) || defined(PS5_CONTROLLER)
 
-    // -----------------------------------------------------------
-    // For PS3 or PS4 controllers, L2 or R2 is the deadman switch.
-    // -----------------------------------------------------------
+    // -----------------------------------------------------------------
+    // For PS3, PS4, or PS5 controllers, L2 or R2 is the deadman switch.
+    // -----------------------------------------------------------------
 
     if ( m_controller->getButtonPress(L2) || m_controller->getButtonPress(R2) ) {
       digitalWrite(DEADMAN_PIN, HIGH);

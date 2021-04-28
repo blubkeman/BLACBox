@@ -32,7 +32,9 @@ const byte TURNING = 2;
 class DomeMotor
 {
   protected:
-    #if defined(PS4_CONTROLLER)
+    #if defined(PS5_CONTROLLER)
+    Controller_PS5 * m_controller;
+    #elif defined(PS4_CONTROLLER)
     Controller_PS4 * m_controller;
     #else
     Controller_PS3 * m_controller;
@@ -63,7 +65,7 @@ class DomeMotor
     virtual ~DomeMotor(void);
     void begin(void);
     void interpretController(void);
-    void runAutomation(void);
+    void runHoloAutomation(void);
     bool isAutomationRunning(void);
 
     virtual void stop(void) {};
@@ -82,7 +84,9 @@ class Syren10_DomeMotor : public DomeMotor
     virtual void m_rotateDome(int rotationSpeed);
 
   public:
-    #if defined(PS4_CONTROLLER)
+    #if defined(PS5_CONTROLLER)
+    Syren10_DomeMotor(Controller_PS5 * pController);
+    #elif defined(PS4_CONTROLLER)
     Syren10_DomeMotor(Controller_PS4 * pController);
     #else
     Syren10_DomeMotor(Controller_PS3 * pController);

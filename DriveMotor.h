@@ -29,7 +29,9 @@ extern HardwareSerial &DriveSerial;
 class DriveMotor
 {
   protected:
-    #if defined(PS4_CONTROLLER)
+    #if defined(PS5_CONTROLLER)
+    Controller_PS5 * m_controller;
+    #elif defined(PS4_CONTROLLER)
     Controller_PS4 * m_controller;
     #else
     Controller_PS3 * m_controller;
@@ -98,7 +100,9 @@ class Roboteq_DriveMotor : public DriveMotor
     #endif
 
   public:
-    #if defined(PS4_CONTROLLER)
+    #if defined(PS5_CONTROLLER)
+    Roboteq_DriveMotor(Controller_PS5 * pController);
+    #elif defined(PS4_CONTROLLER)
     Roboteq_DriveMotor(Controller_PS4 * pController);
     #else
     Roboteq_DriveMotor(Controller_PS3 * pController);

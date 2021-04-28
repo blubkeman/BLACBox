@@ -19,25 +19,25 @@
 // =====================
 //      Constructor
 // =====================
-Controller_Parent::Controller_Parent(void) : m_Usb(), m_Btd(&m_Usb)
+Controller_Wrapper::Controller_Wrapper(void) : m_Usb(), m_Btd(&m_Usb)
 {
   m_controllerConnected = NONE;
   m_disconnectCount = 0;
 
   #ifdef DEBUG
-  m_className = "Controller_Parent::";
+  m_className = "Controller_Wrapper::";
   #endif
 }
 
 // ====================
 //      Destructor
 // ====================
-Controller_Parent::~Controller_Parent(void) {}
+Controller_Wrapper::~Controller_Wrapper(void) {}
 
 // =================
 //      begin()
 // =================
-void Controller_Parent::begin(void)
+void Controller_Wrapper::begin(void)
 {
   // -------------------
   // Start the USB host.
@@ -66,7 +66,7 @@ void Controller_Parent::begin(void)
 // ============================
 //      connectionStatus()
 // ============================
-byte Controller_Parent::connectionStatus(void)
+byte Controller_Wrapper::connectionStatus(void)
 {
   return m_controllerConnected;
 }
@@ -74,7 +74,7 @@ byte Controller_Parent::connectionStatus(void)
 // ============================
 //      duringDisconnect()
 // ============================
-bool Controller_Parent::duringDisconnect(void)
+bool Controller_Wrapper::duringDisconnect(void)
 {
   return (m_disconnectCount > 0 ? true : false);
 }
@@ -82,7 +82,7 @@ bool Controller_Parent::duringDisconnect(void)
 // =================================
 //      continueDisconnecting()
 // =================================
-void Controller_Parent::continueDisconnecting(void)
+void Controller_Wrapper::continueDisconnecting(void)
 {
   // ----------------------------------------------------------------------------------
   // In loop(), each peripheral is given an opportunity to act on the disconnect event.
@@ -100,7 +100,7 @@ void Controller_Parent::continueDisconnecting(void)
 // ========================
 //      m_authorized()
 // ========================
-bool Controller_Parent::m_authorized(void)
+bool Controller_Wrapper::m_authorized(void)
 {
   bool authorized = false;
 
@@ -150,7 +150,7 @@ bool Controller_Parent::m_authorized(void)
 // =================================
 //      m_setConnectionStatus()
 // =================================
-void Controller_Parent::m_setConnectionStatus(byte status)
+void Controller_Wrapper::m_setConnectionStatus(byte status)
 {
   // -----------------------------------------------------------------------
   // Input: NONE (0), HALF (1) or FULL (2)
@@ -167,7 +167,7 @@ void Controller_Parent::m_setConnectionStatus(byte status)
 // ===============================
 //      m_initCriticalFault()
 // ===============================
-void Controller_Parent::m_initCriticalFault(byte idx)
+void Controller_Wrapper::m_initCriticalFault(byte idx)
 {
   m_faultData[idx].badData          = 0;
   m_faultData[idx].lastMsgTime      = millis();
@@ -190,7 +190,7 @@ void Controller_Parent::m_initCriticalFault(byte idx)
 // ================================
 //      m_resetCriticalFault()
 // ================================
-void Controller_Parent::m_resetCriticalFault(byte idx)
+void Controller_Wrapper::m_resetCriticalFault(byte idx)
 {
   m_faultData[idx].badData = 0;
   m_faultData[idx].reconnect = true;
@@ -217,7 +217,7 @@ void Controller_Parent::m_resetCriticalFault(byte idx)
 // =================================
 //      m_detectCriticalFault()
 // =================================
-bool Controller_Parent::m_detectCriticalFault(void)
+bool Controller_Wrapper::m_detectCriticalFault(void)
 {
   unsigned long currentTime;
   unsigned long lastMsgTime;
@@ -363,7 +363,7 @@ bool Controller_Parent::m_detectCriticalFault(void)
 // =============================
 //      getButtonsPressed()
 // =============================
-int Controller_Parent::getButtonsPressed(void)
+int Controller_Wrapper::getButtonsPressed(void)
 {
   int baseButton = -1;
 
@@ -399,7 +399,7 @@ int Controller_Parent::getButtonsPressed(void)
 // ==========================
 //      m_displayInput()
 // ==========================
-void Controller_Parent::m_displayInput()
+void Controller_Wrapper::m_displayInput()
 {
   output = "";
   bool hasBase = false;
@@ -414,7 +414,9 @@ void Controller_Parent::m_displayInput()
   if ( getButtonPress(PS2) ) { output = m_appendString(output, "PS2"); }
 
   if ( getButtonClick(4) ) {
-    #if defined(PS4_CONTROLLER)
+    #if defined(PS5_CONTROLLER)
+    btnLabel = "CREATE";
+    #elif defined(PS4_CONTROLLER)
     btnLabel = "SHARE";
     #elif defined(PS3_CONTROLLER)
     btnLabel = "SELECT";
@@ -427,7 +429,7 @@ void Controller_Parent::m_displayInput()
     output = m_appendString(output, btnLabel);
   }
   if ( getButtonClick(5) ) {
-    #if defined(PS4_CONTROLLER)
+    #if defined(PS4_CONTROLLER) || defined(PS5_CONTROLLER)
     btnLabel = "OPTIONS";
     #elif defined(PS3_CONTROLLER)
     btnLabel = "START";
@@ -539,7 +541,7 @@ void Controller_Parent::m_displayInput()
 // ==========================
 //      m_appendString()
 // ==========================
-String Controller_Parent::m_appendString(String inString, String addString)
+String Controller_Wrapper::m_appendString(String inString, String addString)
 {
   if ( inString != "" ) { inString += F("+"); }
   inString += addString;
@@ -549,7 +551,7 @@ String Controller_Parent::m_appendString(String inString, String addString)
 // ==========================
 //      m_displayStick()
 // ==========================
-void Controller_Parent::m_displayStick(String s, byte x, byte y)
+void Controller_Wrapper::m_displayStick(String s, byte x, byte y)
 {
   if ( output != "" ) {
     output += " + ";
@@ -564,13 +566,14 @@ void Controller_Parent::m_displayStick(String s, byte x, byte y)
 // =========================
 //      m_scrollInput()
 // =========================
-void Controller_Parent::m_scrollInput()
+void Controller_Wrapper::m_scrollInput()
 {
   if ( ! connected() ) {
     return;
   }
 
   /* 
+   * PS5 Controller = LX:x LY:x Up:x Rt:x Dn:x Lt:x L3:x L2:x L1:x PS:x Cr:x Op:x RX:x RY:x Tr:x Ci:x Cr:x Sq:x R3:x R2:x R1:x
    * PS4 Controller = LX:x LY:x Up:x Rt:x Dn:x Lt:x L3:x L2:x L1:x PS:x Sh:x Op:x RX:x RY:x Tr:x Ci:x Cr:x Sq:x R3:x R2:x R1:x
    * PS3 Controller = LX:x LY:x Up:x Rt:x Dn:x Lt:x L3:x L2:x L1:x PS:x Sl:x St:x RX:x RY:x Tr:x Ci:x Cr:x Sq:x R3:x R2:x R1:x
    * PS3 Navigation = LX:x LY:x Up:x Rt:x Dn:x Lt:x L3:x L2:x L1:x PS:x X:x O:x [RX:x RY:x Up2:x Rt2:x Dn2:x Lt2:x R3:x R2:x R1:x PS2:x]
@@ -587,7 +590,10 @@ void Controller_Parent::m_scrollInput()
   output += F(" L3:");  output += getButtonClick(L3);
   output += F(" PS:");  output += getButtonPress(PS);
 
-  #if defined(PS4_CONTROLLER)
+  #if defined(PS5_CONTROLLER)
+  output += F(" Cr:");  output += getButtonPress(4);
+  output += F(" Op:");  output += getButtonPress(5);
+  #elif defined(PS4_CONTROLLER)
   output += F(" Sh:");  output += getButtonPress(4);
   output += F(" Op:");  output += getButtonPress(5);
   #elif defined(PS3_CONTROLLER)
