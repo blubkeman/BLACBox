@@ -2,7 +2,7 @@
  *    B.L.A.C.Box: Brian Lubkeman's Astromech Controller
  * =================================================================================
  * Settings.h - Library for user settings
- * Created by Brian Lubkeman, 4 May 2021
+ * Created by Brian Lubkeman, 5 May 2021
  * Inspired by S.H.A.D.O.W. controller code written by KnightShade
  * Released into the public domain.
  */
@@ -77,7 +77,6 @@ const int syrenSettings[] = {
 // ========================================
 //            Marcduino Settings
 // ========================================
-
 
 const byte marcduinoSettings[] = {
   0,    // FX control system           : 0=Marcduino, no other system supported yet

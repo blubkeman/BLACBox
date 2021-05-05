@@ -2,12 +2,13 @@
  *    B.L.A.C.Box: Brian Lubkeman's Astromech Controller
  * =================================================================================
  * Controller.cpp - Library for supported controllers
- * Created by Brian Lubkeman, 4 May 2021
+ * Created by Brian Lubkeman, 5 May 2021
  * Inspired by S.H.A.D.O.W. controller code written by KnightShade
  * Released into the public domain.
  */
 #include <Arduino.h>
 #include "Controller.h"
+//#include "../../Security.h"
 #include "Security.h"
 
 /* ================================================================================
@@ -61,35 +62,6 @@ void Controller::begin(void)
   #endif
 }
 
-// =======================
-//      displayInit()
-// =======================
-void Controller::displayInit(void)
-{
-  #if defined(DEBUG)
-  output += F("\n  Drive enable:  ");
-  if ( driveEnabled ) {
-    output += F("true");
-  } else {
-    output += F("false");
-  }
-  output += F("\n  Drive stopped: ");
-  if ( driveStopped ) {
-    output += F("true");
-  } else {
-    output += F("false");
-  }
-  output += F("\n  Speed profile: ");
-  switch (speedProfile) {
-    case WALK:   { output += F("Walk");   break; }
-    case JOG:    { output += F("Jog");    break; }
-    case RUN:    { output += F("Run");    break; }
-    case SPRINT: { output += F("Sprint"); break; }
-    default:     { output += F("Unknown"); }
-  };
-  #endif
-}
-
 // ============================
 //      connectionStatus()
 // ============================
@@ -117,7 +89,7 @@ void Controller::disconnecting(void)
   // all have done so.
   // ----------------------------------------------------------------------------------
 
-  if ( m_disconnectCount > pSettings[iPeripheralCount] ) {
+  if ( m_disconnectCount == pSettings[iPeripheralCount] ) {
     m_disconnectCount = 0;
     return;
   }
@@ -305,7 +277,7 @@ bool Controller::m_detectCriticalFault(void)
     // Stop the drive motors after too much lag.
     // -----------------------------------------
 
-    if ( lagTime > pSettings[iLagKillMotor] && driveStopped == false ) {
+    if ( lagTime > pSettings[iLagKillMotor] ) {
 
       #if defined(DEBUG)
       output = m_className+F("m_detectCriticalFault()");
@@ -392,34 +364,6 @@ bool Controller::m_detectCriticalFault(void)
   return false;
 }
 
-// =============================
-//      getButtonsPressed()
-// =============================
-int Controller::getButtonsPressed(void)
-{
-  int baseButton = -1;
-
-  // ------------------------------
-  // Look for pressed base buttons.
-  // Stop when no base button is pressed.
-  // ------------------------------
-
-  if ( getButtonClick(UP) )            { baseButton = 0; }
-  else if ( getButtonClick(RIGHT) )    { baseButton = 1; }
-  else if ( getButtonClick(DOWN) )     { baseButton = 2; }
-  else if ( getButtonClick(LEFT) )     { baseButton = 3; }
-  else if ( getButtonClick(TRIANGLE) ) { baseButton = 4; }
-  else if ( getButtonClick(CIRCLE) )   { baseButton = 5; }
-  else if ( getButtonClick(CROSS) )    { baseButton = 6; }
-  else if ( getButtonClick(SQUARE) )   { baseButton = 7; }
-  else { return baseButton; }
-
-  // ----------------------------
-  // Return the calculated index.
-  // ----------------------------
-
-  return ( baseButton + m_getModifierButtons() );
-}
 /* ================================================================================
  *                                   Button Class
  * ================================================================================ */
@@ -441,29 +385,12 @@ Button::Button(Controller* pController)
 // ====================
 Button::~Button(void) {}
 
-// ===================
-//      clicked()
-// ===================
-byte Button::clicked(int buttonEnum)
-{
-  m_controller->getButtonClick(buttonEnum);
-}
-
-// ===================
-//      pressed()
-// ===================
-byte Button::pressed(int buttonEnum)
-{
-  m_controller->getButtonPress(buttonEnum);
-}
-
-// =======================
-//      analogValue()
-// =======================
-byte Button::analogValue(int buttonEnum)
-{
-  m_controller->getAnalogButton(buttonEnum);
-}
+// ============================
+//      Get button actions
+// ============================
+bool Button::clicked(int buttonEnum)     { return m_controller->getButtonClick(buttonEnum); }
+bool Button::pressed(int buttonEnum)     { return m_controller->getButtonPress(buttonEnum); }
+byte Button::analogValue(int buttonEnum) { return m_controller->getAnalogButton(buttonEnum); }
 
 /* ================================================================================
  *                                  Joystick Class

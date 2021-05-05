@@ -2,16 +2,20 @@
  *    B.L.A.C.Box: Brian Lubkeman's Astromech Controller
  * =================================================================================
  * Peripheral_Marcduino.h - Library for the Marcduino system
- * Created by Brian Lubkeman, 4 May 2021
+ * Created by Brian Lubkeman, 5 May 2021
  * Inspired by S.H.A.D.O.W. controller code written by KnightShade
  * Released into the public domain.
  */
 #ifndef __BLACBOX_MARCDUINO_H__
 #define __BLACBOX_MARCDUINO_H__
 
+//#include "../Controller/Controller.h"
 #include "Controller.h"
 
 #define DEBUG
+#if defined(DEBUG)
+//#define VERBOSE
+#endif
 
 #if defined(DEBUG)
 extern String output;
@@ -37,12 +41,13 @@ enum marcduino_setting_index_e {
   iSoundMaster, // 2  - Marcduino master controling sound.
   iCmdSet,      // 3  - Marcduino command set.
   iSoundBoard,  // 4  - Sound board.
-  iBodyPanels,  // 5  - Number of body panels on servos.
-  iDomePanels,  // 6  - Number of dome panels on servos.
-  iHp,          // 7  - Number of holoprojectors on servos.
-  iHpDelayMin,  // 8  - HP automation delay min.
-  iHpDelayMax,  // 9  - HP automation delay max.
-  iRadio        // 10 - Feather radio in use 
+  iMagicPanel,  // 5  - Magic panel is used.
+  iBodyPanels,  // 6  - Number of body panels on servos.
+  iDomePanels,  // 7  - Number of dome panels on servos.
+  iHp,          // 8  - Number of holoprojectors on servos.
+  iHpDelayMin,  // 9  - HP automation delay min.
+  iHpDelayMax,  // 10 - HP automation delay max.
+  iRadio        // 11 - Feather radio in use 
 };
 
 enum panel_action_e {
@@ -59,6 +64,8 @@ class Marcduino {
     Controller* m_controller;
     byte* m_settings;
 
+    Button* m_button;
+
     int m_buttonIndex;
     bool m_holoAutomationRunning;
     unsigned long m_randomSeconds[3];
@@ -74,6 +81,7 @@ class Marcduino {
 
     bool m_aurabesh;
 
+    int  m_getButtonsPressed(void);
     void m_sendCommand(String, HardwareSerial *);
 
     // Preprogrammed modes

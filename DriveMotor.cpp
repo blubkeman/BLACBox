@@ -2,7 +2,7 @@
  *    B.L.A.C.Box: Brian Lubkeman's Astromech Controller
  * =================================================================================
  * DriveMotor.cpp - Library for supported drive motor controllers
- * Created by Brian Lubkeman, 23 March 2021
+ * Created by Brian Lubkeman, 5 May 2021
  * Inspired by S.H.A.D.O.W. controller code written by KnightShade
  * Released into the public domain.
  */
@@ -25,9 +25,10 @@ DriveMotor::DriveMotor(Controller* pController, const int settings[], const byte
   m_joystick = &m_controller->driveStick;
   m_button = &m_controller->button;
 
-  driveEnabled = true;
-  driveStopped = true;
-  speedProfile = WALK;
+  driveEnabled   = true;
+  driveStopped   = true;
+  speedProfile   = WALK;
+  prevConnStatus = NONE;
 
   // ----------
   // Debugging.
@@ -81,6 +82,35 @@ void DriveMotor::begin()
   }
 }
 
+// =======================
+//      displayInit()
+// =======================
+void DriveMotor::displayInit(void)
+{
+  #if defined(DEBUG)
+  output += F("\n  Drive enable:  ");
+  if ( driveEnabled ) {
+    output += F("true");
+  } else {
+    output += F("false");
+  }
+  output += F("\n  Drive stopped: ");
+  if ( driveStopped ) {
+    output += F("true");
+  } else {
+    output += F("false");
+  }
+  output += F("\n  Speed profile: ");
+  switch (speedProfile) {
+    case WALK:   { output += F("Walk");   break; }
+    case JOG:    { output += F("Jog");    break; }
+    case RUN:    { output += F("Run");    break; }
+    case SPRINT: { output += F("Sprint"); break; }
+    default:     { output += F("Unknown"); }
+  };
+  #endif
+}
+
 // ===============================
 //      interpretController()
 // ===============================
@@ -89,8 +119,14 @@ void DriveMotor::interpretController(void)
   // -------------------------------------------------
   // Do nothing when there is no controller connected.
   // -------------------------------------------------
-  
-  if ( m_controller->connectionStatus() == NONE ) {
+
+  byte connStatus = m_controller->connectionStatus();
+  if ( connStatus == NONE ) {
+
+    if ( prevConnStatus != NONE ) {
+      prevConnStatus = NONE;
+    }
+    
     #if defined(DEBUG)
     output = m_className+F("interpretController()");
     output += F(" - ");
@@ -100,12 +136,21 @@ void DriveMotor::interpretController(void)
     return;
   }
 
+  // ----------------------------------------------------------
+  // When there is a new controller connection, update the LED.
+  // ----------------------------------------------------------
+
+  if ( prevConnStatus == NONE ) {
+    prevConnStatus = connStatus;
+    m_controller->setLed(driveEnabled, speedProfile);
+  }
+
   // ---------------------------------------
   // Look for a change in the speed profile.
   // ---------------------------------------
 
-  if ( (m_joystick->side == 0 && m_button->pressed(L1) && m_button->pressed(L3)) ||
-       (m_joystick->side == 1 && m_button->pressed(R1) && m_button->pressed(R3)) ) {
+  if ( (m_joystick->side == left && m_button->pressed(L1) && m_button->clicked(L3)) ||
+       (m_joystick->side == right && m_button->pressed(R1) && m_button->clicked(R3)) ) {
     m_setSpeedProfile();
   }
 
@@ -115,7 +160,7 @@ void DriveMotor::interpretController(void)
 
   if ( m_button->pressed(PS) || m_button->pressed(PS2) ) {
 
-    if ( driveEnabled && m_button->pressed(L4) ) {
+    if ( driveEnabled && m_button->clicked(L4) ) {
 
       #if defined(DEBUG)
       output = m_className+F("interpretController()");
@@ -126,9 +171,9 @@ void DriveMotor::interpretController(void)
       #endif
 
       driveEnabled = false;
-      m_controller->setLed();
+      m_controller->setLed(driveEnabled, speedProfile);
 
-    } else if ( ! driveEnabled && m_button->pressed(R4) ) {
+    } else if ( ! driveEnabled && m_button->clicked(R4) ) {
       
       #if defined(DEBUG)
       output = m_className+F("interpretController()");
@@ -139,7 +184,7 @@ void DriveMotor::interpretController(void)
       #endif
 
       driveEnabled = true;
-      m_controller->setLed();
+      m_controller->setLed(driveEnabled, speedProfile);
 
     }
   }
@@ -179,8 +224,8 @@ void DriveMotor::interpretController(void)
   // Skip reading the joystick in this case.
   // -------------------------------------------------------
 
-  if ( (m_joystick->side == 0 && m_button->pressed(L1)) ||
-       (m_joystick->side == 1 && m_button->pressed(R1)) ) {
+  if ( (m_joystick->side == left && m_button->pressed(L1)) ||
+       (m_joystick->side == right && m_button->pressed(R1)) ) {
     return;
   }
 
@@ -246,7 +291,7 @@ void DriveMotor::m_setSpeedProfile(void)
 
   }
 
-  m_controller->setLed();
+  m_controller->setLed(driveEnabled, speedProfile);
   m_writeScript();
 
   #if defined(DEBUG)

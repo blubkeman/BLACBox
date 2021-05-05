@@ -2,7 +2,7 @@
  *    B.L.A.C.Box: Brian Lubkeman's Astromech Controller
  * =================================================================================
  * DriveMotor_Roboteq.cpp - Library for the Roboteq SBL2360 or SBL1360 drive motor controller
- * Created by Brian Lubkeman, 23 March 2021
+ * Created by Brian Lubkeman, 5 May 2021
  * Inspired by S.H.A.D.O.W. controller code written by KnightShade
  * Released into the public domain.
  */
@@ -88,6 +88,7 @@ void DriveMotor_Roboteq::begin(void)
   output += F(" - ");
   output += F("Roboteq");
   output += F(" motor controller started.");
+  displayInit();
   printOutput();
   #endif
 }

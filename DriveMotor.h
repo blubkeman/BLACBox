@@ -2,7 +2,7 @@
  *    B.L.A.C.Box: Brian Lubkeman's Astromech Controller
  * =================================================================================
  * DriveMotor.h - Library for supported drive motor controllers
- * Created by Brian Lubkeman, 23 March 2021
+ * Created by Brian Lubkeman, 5 May 2021
  * Inspired by S.H.A.D.O.W. controller code written by KnightShade
  * Released into the public domain.
  */
@@ -10,7 +10,10 @@
 #define __BLACBOX_DRIVE_MOTOR_H__
 
 #include <Servo.h>
+//#include "../Controller/Controller.h"
 #include "Controller.h"
+
+#define DEBUG
 
 #if defined(DEBUG)
 extern String output;
@@ -50,6 +53,7 @@ class DriveMotor
     bool driveEnabled;
     bool driveStopped;
     byte speedProfile;
+    byte prevConnStatus;
 
     const int m_servoMin = 0;
     const int m_servoCenter = 90;
@@ -79,6 +83,7 @@ class DriveMotor
     DriveMotor(Controller* pController, const int settings[], const byte pins[]);
     virtual ~DriveMotor(void);
     void begin(void);
+    void displayInit(void);
     void interpretController(void);
     virtual void stop(void) {};
 };

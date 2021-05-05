@@ -2,7 +2,7 @@
  *    B.L.A.C.Box: Brian Lubkeman's Astromech Controller
  * =================================================================================
  * DomeMotor.cpp - Library for supported dome motor controllers
- * Created by Brian Lubkeman, 4 May 2021
+ * Created by Brian Lubkeman, 5 May 2021
  * Inspired by S.H.A.D.O.W. controller code written by KnightShade
  * Released into the public domain.
  */
@@ -72,7 +72,7 @@ void DomeMotor::begin(void)
 
     m_automationSettingsInvalid = true;
 
-    #if defined(DEBUG)
+    #if defined(VERBOSE)
     output = m_className+F("begin()");
     output += F(" - ");
     output += F("Invalid settings.");
@@ -127,9 +127,9 @@ void DomeMotor::interpretController(void)
   // ----------------------------------------
 
   if ( m_button->pressed(L2) || m_button->pressed(R2) ) {
-    if ( m_button->pressed(L4) && isAutomationRunning() ) {
+    if ( m_button->clicked(L4) && isAutomationRunning() ) {
       m_automationOff();
-    } else if ( m_button->pressed(R4) && ! isAutomationRunning() ) {
+    } else if ( m_button->clicked(R4) && ! isAutomationRunning() ) {
       m_automationOn();
     }
   }
@@ -147,6 +147,14 @@ void DomeMotor::interpretController(void)
   // ================================
   // Look for dome rotation commands.
   // ================================
+
+  // When L1|R1 is pressed, anticipate L3|R3 being pressed.
+  // When this happens, do not read the stick position.
+
+  if ( (m_joystick->side == left && m_button->pressed(L1)) ||
+       (m_joystick->side == right && m_button->pressed(R1)) ) {
+    return;
+  }
 
   // --------------------------
   // Get the joystick position.
@@ -333,7 +341,7 @@ void DomeMotor::m_automationInit(void)
   // Debugging.
   // ----------
 
-  #if defined(DEBUG)
+  #if defined(VERBOSE)
   output = m_className+F("m_automationInit()");
   output += F(" - ");
   output += F("Turn set");
@@ -363,7 +371,7 @@ void DomeMotor::m_automationReady(void)
     // Debugging.
     // ----------
 
-    #if defined(DEBUG)
+    #if defined(VERBOSE)
     output = m_className+F("m_automationReady()");
     output += F(" - ");
     output += F("Ready to turn");
@@ -383,7 +391,7 @@ void DomeMotor::m_automationTurn(void)
     // Actively turn the dome until it reaches its stop time.
     // ------------------------------------------------------
 
-    #if defined(DEBUG)
+    #if defined(VERBOSE)
     output = m_className+F("m_automationTurn()");
     output += F(" - ");
     output += F("Turning.");
@@ -399,7 +407,7 @@ void DomeMotor::m_automationTurn(void)
     // Turn completed. Stop the motor.
     // -------------------------------
 
-    #if defined(DEBUG)
+    #if defined(VERBOSE)
     output = m_className+F("m_automationTurn()");
     output += F(" - ");
     output += F("Stop turning.");

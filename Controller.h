@@ -2,7 +2,7 @@
  *    B.L.A.C.Box: Brian Lubkeman's Astromech Controller
  * =================================================================================
  * Controller.h - Library for supported controllers
- * Created by Brian Lubkeman, 4 May 2021
+ * Created by Brian Lubkeman, 5 May 2021
  * Inspired by S.H.A.D.O.W. controller code written by KnightShade
  * Released into the public domain.
  */
@@ -16,7 +16,7 @@
 #include <PS3BT.h>
 #include "controllerEnums.h"
 
-//#define DEBUG
+#define DEBUG
 //#define TEST_CONTROLLER
 
 #if defined(DEBUG) || defined(TEST_CONTROLLER)
@@ -57,6 +57,11 @@ enum speed_profile_e {
   JOG,
   RUN,
   SPRINT
+};
+
+enum joystick_side_e {
+  left,
+  right
 };
 
 class Controller; // Class prototype
@@ -140,8 +145,8 @@ class Button
     Button(Controller* pCcontroller);
     ~Button(void);
 
-    byte clicked(int buttonEnum);
-    byte pressed(int buttonEnum);
+    bool clicked(int buttonEnum);
+    bool pressed(int buttonEnum);
     byte analogValue(int buttonEnum);
 
     #if defined(TEST_CONTROLLER)
@@ -176,7 +181,6 @@ class Controller
     virtual void m_disconnect(void) {};
     virtual bool m_getUsbStatus(void) {};
     virtual bool m_detectCriticalFault(void);
-    virtual int  m_getModifierButtons(void) {};
 
     #if defined(DEBUG)
     String m_className;
@@ -195,16 +199,10 @@ class Controller
     Joystick_Dome domeStick;
     Button button;
 
-    bool driveEnabled;
-    bool driveStopped;
-    byte speedProfile;
-
     void begin(void);
-    void displayInit(void);
     byte connectionStatus(void);
     void disconnecting(void);
     bool isDisconnecting(void);
-    int  getButtonsPressed(void);
     int  getType(void);
 
     virtual bool read(void) {};
@@ -213,7 +211,80 @@ class Controller
     virtual bool getButtonPress(int buttonEnum) {};
     virtual int  getAnalogButton(int buttonEnum) {};
     virtual int  getAnalogHat(int stickEnum) {};
-    virtual void setLed(void) {};
+    virtual void setLed(bool driveEnabled, byte speedProfile) {};
+};
+
+/* ================================================================================
+ *                                  PS3Nav Controller
+ * ================================================================================ */
+class Controller_PS3Nav : public Controller
+{
+  private:
+    PS3BT m_controller;
+    PS3BT m_secondController;
+
+    static void m_onInit(void);
+    void m_onInitConnect(void);
+
+    virtual void m_connect(PS3BT * pController);
+    virtual void m_disconnect(PS3BT * pController);
+    virtual bool m_getUsbStatus(void);
+    virtual bool m_detectCriticalFault(PS3BT * pController);
+
+    #if defined(DEBUG)
+    String m_className;
+    #endif
+
+  public:
+    Controller_PS3Nav(int settings[]);
+    virtual ~Controller_PS3Nav(void);
+
+    static Controller_PS3Nav* Controller_PS3Nav::anchor;
+
+    void begin(void);
+
+    virtual bool read(void);
+    virtual bool connected(PS3BT * pController);
+    virtual bool getButtonClick(int buttonEnum);
+    virtual bool getButtonPress(int buttonEnum);
+    virtual int  getAnalogButton(int buttonEnum);
+    virtual int  getAnalogHat(int stickEnum);
+    virtual void setLed(bool driveEnabled, byte speedProfile);
+};
+
+/* ================================================================================
+ *                                  PS3 Controller
+ * ================================================================================ */
+class Controller_PS3 : public Controller
+{
+  private:
+    PS3BT m_controller;
+
+    static void m_onInit(void);
+
+    virtual void m_connect(void);
+    virtual void m_disconnect(void);
+    virtual bool m_getUsbStatus(void);
+
+    #if defined(DEBUG)
+    String m_className;
+    #endif
+
+  public:
+    Controller_PS3(int settings[]);
+    virtual ~Controller_PS3(void);
+
+    static Controller_PS3* Controller_PS3::anchor;
+
+    void begin(void);
+
+    virtual bool read(void);
+    virtual bool connected(void);
+    virtual bool getButtonClick(int buttonEnum);
+    virtual bool getButtonPress(int buttonEnum);
+    virtual int  getAnalogButton(int buttonEnum);
+    virtual int  getAnalogHat(int stickEnum);
+    virtual void setLed(bool driveEnabled, byte speedProfile);
 };
 
 /* ================================================================================
@@ -229,7 +300,6 @@ class Controller_PS4 : public Controller
     virtual void m_connect(void);
     virtual void m_disconnect(void);
     virtual bool m_getUsbStatus(void);
-    virtual int  m_getModifierButtons(void);
 
     #if defined(DEBUG)
     String m_className;
@@ -249,7 +319,42 @@ class Controller_PS4 : public Controller
     virtual bool getButtonPress(int buttonEnum);
     virtual int  getAnalogButton(int buttonEnum);
     virtual int  getAnalogHat(int stickEnum);
-    virtual void setLed(void);
+    virtual void setLed(bool driveEnabled, byte speedProfile);
+};
+
+/* ================================================================================
+ *                                  PS5 Controller
+ * ================================================================================ */
+class Controller_PS5 : public Controller
+{
+  private:
+    PS5BT m_controller;
+
+    static void m_onInit(void);
+
+    virtual void m_connect(void);
+    virtual void m_disconnect(void);
+    virtual bool m_getUsbStatus(void);
+
+    #if defined(DEBUG)
+    String m_className;
+    #endif
+
+  public:
+    Controller_PS5(int settings[]);
+    virtual ~Controller_PS5(void);
+
+    static Controller_PS5* Controller_PS5::anchor;
+
+    void begin(void);
+
+    virtual bool read(void);
+    virtual bool connected(void);
+    virtual bool getButtonClick(int buttonEnum);
+    virtual bool getButtonPress(int buttonEnum);
+    virtual int  getAnalogButton(int buttonEnum);
+    virtual int  getAnalogHat(int stickEnum);
+    virtual void setLed(bool driveEnabled, byte speedProfile);
 };
 
 #endif

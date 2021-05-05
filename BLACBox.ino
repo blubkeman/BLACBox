@@ -1,7 +1,7 @@
 /* =================================================================================
  *    B.L.A.C.Box: Brian Lubkeman's Astromech Controller
  * =================================================================================
- *                          Last Revised Date: 4 May 2021
+ *                          Last Revised Date: 5 May 2021
  *                          Revised By: Brian E. Lubkeman
  *  Inspired by the PADAWAN (danf), SHADOW (KnightShade), SHADOW_MD (vint43) effort
  * =================================================================================
@@ -59,6 +59,12 @@
  *   Adafruit I2C PWM driver          (https://www.adafruit.com/product/815)
  */
 #include "Settings.h"
+/*
+#include "src/Controller/Controller.h"
+#include "src/DomeMotor/DomeMotor.h"
+#include "src/DriveMotor/DriveMotor.h"
+#include "src/Marcduino/Marcduino.h"
+*/
 #include "Controller.h"
 #include "DomeMotor.h"
 #include "DriveMotor.h"
@@ -66,6 +72,14 @@
 
 Controller_PS4 controller(controllerSettings);
 Controller_PS4* Controller_PS4::anchor = { NULL };
+/*
+Controller_PS3Nav controller(controllerSettings);
+Controller_PS3Nav* Controller_PS3Nav::anchor = { NULL };
+Controller_PS3 controller(controllerSettings);
+Controller_PS3* Controller_PS3::anchor = { NULL };
+Controller_PS5 controller(controllerSettings);
+Controller_PS5* Controller_PS5::anchor = { NULL };
+*/
 
 DomeMotor_Syren10 domeMotor(&controller, domeMotorSettings, domeMotorTimings, syrenSettings);
 HardwareSerial &DomeMotorSerial = Serial2;

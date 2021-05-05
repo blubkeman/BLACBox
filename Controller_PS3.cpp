@@ -1,7 +1,7 @@
 /* =================================================================================
  *    B.L.A.C.Box: Brian Lubkeman's Astromech Controller
  * =================================================================================
- * Controller_PS4.cpp - Library for supported controllers
+ * Controller_PS3.cpp - Library for supported controllers
  * Created by Brian Lubkeman, 5 May 2021
  * Inspired by S.H.A.D.O.W. controller code written by KnightShade
  * Released into the public domain.
@@ -10,30 +10,30 @@
 #include "Controller.h"
 
 /* ================================================================================
- *                                  PS4 Controller
+ *                                  PS3 Controller
  * ================================================================================ */
 
 // =====================
 //      Constructor
 // =====================
-Controller_PS4::Controller_PS4(int settings[])
+Controller_PS3::Controller_PS3(int settings[])
   : Controller(settings),
     m_controller(&m_Btd)
 {
   #if defined(DEBUG)
-  m_className = "Controller_PS4::";
+  m_className = "Controller_PS3::";
   #endif
 }
 
 // ====================
 //      Destructor
 // ====================
-Controller_PS4::~Controller_PS4(void) {}
+Controller_PS3::~Controller_PS3(void) {}
 
 // =================
 //      begin()
 // =================
-void Controller_PS4::begin(void)
+void Controller_PS3::begin(void)
 {
   // -----------------------------------------------------------
   // Call the parent class begin() to start the USB Host Shield.
@@ -56,7 +56,7 @@ void Controller_PS4::begin(void)
   output = m_className+F("begin()");
   output += F(" - ");
   output += F("Ready to connect a");
-  output += F(" PS4");
+  output += F(" PS3");
   output += F(" controller");
 
   output += F("\n  Drive stick:   ");
@@ -70,7 +70,7 @@ void Controller_PS4::begin(void)
 // ====================
 //      m_onInit()
 // ====================
-static void Controller_PS4::m_onInit(void)
+static void Controller_PS3::m_onInit(void)
 {
   if (anchor != NULL) {
     anchor->m_connect();
@@ -80,7 +80,7 @@ static void Controller_PS4::m_onInit(void)
 // ===================
 //      m_connect
 // ===================
-void Controller_PS4::m_connect(void)
+void Controller_PS3::m_connect(void)
 {
   // --------------------------------------------------------------
   // First, let's make sure we have a controller.  If not, drop it.
@@ -100,22 +100,14 @@ void Controller_PS4::m_connect(void)
     return;
   }
 
-  // --------------------------------------------------------------------------------
-  // Somehow, the USB Host Shield calls onInit twice per connection for the PS4 only.
-  // The following use of connectionStatus() helps us process this content only once.
-  // --------------------------------------------------------------------------------
+  // --------------------------------------------------
+  // Validate the MAC address of the controller against
+  // our list of authorized devices.
+  // --------------------------------------------------
 
-  if ( connectionStatus() > NONE ) {
-
-    // --------------------------------------------------
-    // Validate the MAC address of the controller against
-    // our list of authorized devices.
-    // --------------------------------------------------
-
-    if ( ! m_authorized() ) {
-      m_disconnect();
-      return;
-    }
+  if ( ! m_authorized() ) {
+    m_disconnect();
+    return;
   }
 
   // --------------------
@@ -142,7 +134,7 @@ void Controller_PS4::m_connect(void)
 // ========================
 //      m_disconnect()
 // ========================
-void Controller_PS4::m_disconnect(void)
+void Controller_PS3::m_disconnect(void)
 {
   m_controller.setLedOff();
   m_controller.disconnect();
@@ -159,60 +151,31 @@ void Controller_PS4::m_disconnect(void)
 // ==================
 //      setLed()
 // ==================
-void Controller_PS4::setLed(bool driveEnabled, byte speedProfile)
+void Controller_PS3::setLed(bool driveEnabled, byte speedProfile)
 {
-  if ( ! driveEnabled ) {
-    m_controller.setLed(Red);
-  } else {
-    switch (speedProfile) {
-      case WALK: {
-        m_controller.setLed(Yellow);
-        break;
-      }
-      case JOG: {
-        m_controller.setLed(Green);
-        break;
-      }
-      case RUN: {
-        m_controller.setLed(Blue);
-        break;
-      }
-      case SPRINT: {
-        m_controller.setLed(Purple);
-        break;
-      }
-      default: {
-        #if defined(DEBUG)
-        output = m_className+F("setLed()");
-        output += F(" - ");
-        output += F("Speed profile unknown");
-        printOutput();
-        #endif
-      }
-    }
-  }
+  m_controller.setLedOn(LED1);
 }
 
 // ==========================
 //      m_getUsbStatus()
 // ==========================
-bool Controller_PS4::m_getUsbStatus(void)
+bool Controller_PS3::m_getUsbStatus(void)
 {
-  return m_controller.getUsbStatus();
+  return ( m_controller.getStatus(Plugged) && m_controller.getStatus(Unplugged) );
 }
 
 // =====================
 //      connected()
 // =====================
-bool Controller_PS4::connected(void)
+bool Controller_PS3::connected(void)
 {
-  return m_controller.connected();
+  return m_controller.PS3Connected;
 }
 
 // ================
 //      read()
 // ================
-bool Controller_PS4::read()
+bool Controller_PS3::read()
 {
   // ------------------------------
   // Get input from the controller.
@@ -259,7 +222,7 @@ bool Controller_PS4::read()
 // ==============================
 //      Get Button Functions
 // ==============================
-bool Controller_PS4::getButtonClick(int buttonEnum) { return m_controller.getButtonClick(buttonEnum); };
-bool Controller_PS4::getButtonPress(int buttonEnum) { return m_controller.getButtonPress(buttonEnum); };
-int Controller_PS4::getAnalogButton(int buttonEnum) { return m_controller.getAnalogButton(buttonEnum); };
-int Controller_PS4::getAnalogHat(int stickEnum)     { return m_controller.getAnalogHat(stickEnum); }
+bool Controller_PS3::getButtonClick(int buttonEnum) { return m_controller.getButtonClick(buttonEnum); };
+bool Controller_PS3::getButtonPress(int buttonEnum) { return m_controller.getButtonPress(buttonEnum); };
+int Controller_PS3::getAnalogButton(int buttonEnum) { return m_controller.getAnalogButton(buttonEnum); };
+int Controller_PS3::getAnalogHat(int stickEnum)     { return m_controller.getAnalogHat(stickEnum); }

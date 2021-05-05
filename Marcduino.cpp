@@ -2,7 +2,7 @@
  *    B.L.A.C.Box: Brian Lubkeman's Astromech Controller
  * =================================================================================
  * Peripheral_Marcduino.cpp - Library for the Marcduino system
- * Created by Brian Lubkeman, 23 March 2021
+ * Created by Brian Lubkeman, 5 May 2021
  * Inspired by S.H.A.D.O.W. controller code written by KnightShade
  * Released into the public domain.
  */
@@ -19,6 +19,9 @@
 Marcduino::Marcduino(Controller* pController, const byte settings[])
 {
   m_controller = pController;
+  m_settings = settings;
+  m_button = &m_controller->button;
+
   m_cprRunning = false;
   m_holoAutomationRunning = false;
   m_aurabesh = false;
@@ -48,13 +51,6 @@ void Marcduino::begin()
   if ( m_settings[iBodyMaster] ) {
     MD_Body_Serial.begin(MARCDUINO_BAUD_RATE);
   }
-
-  #if defined(DEBUG)
-  output = m_className+F("begin()");
-  output += F(" - ");
-  output += F("Marcduino started.");
-  printOutput();
-  #endif
 }
 
 // ===============================
@@ -80,67 +76,30 @@ void Marcduino::interpretController(void)
   // Determine what button combination is being pressed.
   // ---------------------------------------------------
 
-  m_buttonIndex = m_controller->getButtonsPressed();
+  m_buttonIndex = m_getButtonsPressed();
 
-  #if defined(DEBUG)
-  output = m_className+F("interpretController()");
-  output += F(" - ");
-  output += F("mapIndex = ");
-  output += m_buttonIndex;
-  printOutput();
+  #if defined(VERBOSE)
+  if ( m_buttonIndex > -1 ) {
+    output = m_className+F("interpretController()");
+    output += F(" - ");
+    output += F("Button combo: ");
+    output += m_buttonIndex;
+    printOutput();
+  }
   #endif
 
-  if ( m_settings[iCmdSet] == 1 ) {
-
-    // This is where you may define your own button combo mappings.
-
-    switch (m_buttonIndex) {
-      case 0 :  { break; } // UP
-      case 1 :  { break; } // RIGHT
-      case 2 :  { break; } // DOWN
-      case 3 :  { break; } // LEFT
-      case 4 :  { break; } // TRIANGLE
-      case 5 :  { break; } // CIRCLE
-      case 6 :  { break; } // CROSS
-      case 7 :  { break; } // SQUARE
-      case 8 :  { break; } // L1/R1 + UP
-      case 9 :  { break; } // L1/R1 + RIGHT
-      case 10 : { break; } // L1/R1 + DOWN
-      case 11 : { break; } // L1/R1 + LEFT
-      case 12 : { break; } // L1/R1 + TRIANGLE
-      case 13 : { break; } // L1/R1 + CIRCLE
-      case 14 : { break; } // L1/R1 + CROSS
-      case 15 : { break; } // L1/R1 + SQUARE
-      case 16 : { break; } // SHARE/SELECT + UP
-      case 17 : { break; } // SHARE/SELECT + RIGHT
-      case 18 : { break; } // SHARE/SELECT + DOWN
-      case 19 : { break; } // SHARE/SELECT + LEFT
-      case 20 : { break; } // SHARE/SELECT + TRIANGLE
-      case 21 : { break; } // SHARE/SELECT + CIRCLE
-      case 22 : { break; } // SHARE/SELECT + CROSS
-      case 23 : { break; } // SHARE/SELECT + SQUARE
-      case 24 : { break; } // OPTIONS/START + UP
-      case 25 : { break; } // OPTIONS/START + RIGHT
-      case 26 : { break; } // OPTIONS/START + DOWN
-      case 27 : { break; } // OPTIONS/START + LEFT
-      case 28 : { break; } // OPTIONS/START + TRIANGLE
-      case 29 : { break; } // OPTIONS/START + CIRCLE
-      case 30 : { break; } // OPTIONS/START + CROSS
-      case 31 : { break; } // OPTIONS/START + SQUARE
-      case 32 : { break; } // PS/PS2 + UP
-      case 33 : { break; } // PS/PS2 + RIGHT
-      case 34 : { break; } // PS/PS2 + DOWN
-      case 35 : { break; } // PS/PS2 + LEFT
-      case 36 : { break; } // PS/PS2 + TRIANGLE
-      case 37 : { break; } // PS/PS2 + CIRCLE
-      case 38 : { break; } // PS/PS2 + CROSS
-      case 39 : { break; } // PS/PS2 + SQUARE
-      default : { break; }
-    }
-
-  } else if ( m_settings[iCmdSet] == 0 ) {
+  if ( m_settings[iCmdSet] == 0 ) {
 
     // These mappings should mimic the SHADOW+MD controls.
+
+    #if defined(VERBOSE)
+    if ( m_buttonIndex > -1 ) {
+      output = m_className+F("interpretController()");
+      output += F(" - ");
+      output += F("SHADOW+MD command set.");
+      printOutput();
+    }
+    #endif
 
     switch (m_buttonIndex) {
       case 0 :  { m_fullAwakeMode();   break; } // UP
@@ -198,12 +157,118 @@ void Marcduino::interpretController(void)
       default : { break; }
     }
 
+  } else if ( m_settings[iCmdSet] == 1 ) {
+
+    // This is where you may define your own button combo mappings.
+
+    #if defined(VERBOSE)
+    if ( m_buttonIndex > -1 ) {
+      output = m_className+F("interpretController()");
+      output += F(" - ");
+      output += F("Custom command set.");
+      printOutput();
+    }
+    #endif
+    switch (m_buttonIndex) {
+      case 0 :  { break; } // UP
+      case 1 :  { break; } // RIGHT
+      case 2 :  { break; } // DOWN
+      case 3 :  { break; } // LEFT
+      case 4 :  { break; } // TRIANGLE
+      case 5 :  { break; } // CIRCLE
+      case 6 :  { break; } // CROSS
+      case 7 :  { break; } // SQUARE
+      case 8 :  { break; } // L1/R1 + UP
+      case 9 :  { break; } // L1/R1 + RIGHT
+      case 10 : { break; } // L1/R1 + DOWN
+      case 11 : { break; } // L1/R1 + LEFT
+      case 12 : { break; } // L1/R1 + TRIANGLE
+      case 13 : { break; } // L1/R1 + CIRCLE
+      case 14 : { break; } // L1/R1 + CROSS
+      case 15 : { break; } // L1/R1 + SQUARE
+      case 16 : { break; } // SHARE/SELECT + UP
+      case 17 : { break; } // SHARE/SELECT + RIGHT
+      case 18 : { break; } // SHARE/SELECT + DOWN
+      case 19 : { break; } // SHARE/SELECT + LEFT
+      case 20 : { break; } // SHARE/SELECT + TRIANGLE
+      case 21 : { break; } // SHARE/SELECT + CIRCLE
+      case 22 : { break; } // SHARE/SELECT + CROSS
+      case 23 : { break; } // SHARE/SELECT + SQUARE
+      case 24 : { break; } // OPTIONS/START + UP
+      case 25 : { break; } // OPTIONS/START + RIGHT
+      case 26 : { break; } // OPTIONS/START + DOWN
+      case 27 : { break; } // OPTIONS/START + LEFT
+      case 28 : { break; } // OPTIONS/START + TRIANGLE
+      case 29 : { break; } // OPTIONS/START + CIRCLE
+      case 30 : { break; } // OPTIONS/START + CROSS
+      case 31 : { break; } // OPTIONS/START + SQUARE
+      case 32 : { break; } // PS/PS2 + UP
+      case 33 : { break; } // PS/PS2 + RIGHT
+      case 34 : { break; } // PS/PS2 + DOWN
+      case 35 : { break; } // PS/PS2 + LEFT
+      case 36 : { break; } // PS/PS2 + TRIANGLE
+      case 37 : { break; } // PS/PS2 + CIRCLE
+      case 38 : { break; } // PS/PS2 + CROSS
+      case 39 : { break; } // PS/PS2 + SQUARE
+      default : { break; }
+    }
+
   } else {
 
     // Unknown command set setting.
 
+    #if defined(DEBUG)
+    output = m_className+F("interpretController()");
+    output += F(" - ");
+    output += F("Unknown command set.");
+    printOutput();
+    #endif
+
     return;
   }
+}
+
+// ===============================
+//      m_getButtonsPressed()
+// ===============================
+int Marcduino::m_getButtonsPressed(void)
+{
+  int baseButton = -1;
+
+  // ------------------------------
+  // Look for pressed base buttons.
+  // Stop when none are pressed.
+  // ------------------------------
+
+  if ( m_button->clicked(UP) )            { baseButton = 0; }
+  else if ( m_button->clicked(RIGHT) )    { baseButton = 1; }
+  else if ( m_button->clicked(DOWN) )     { baseButton = 2; }
+  else if ( m_button->clicked(LEFT) )     { baseButton = 3; }
+  else if ( m_button->clicked(TRIANGLE) ) { baseButton = 4; }
+  else if ( m_button->clicked(CIRCLE) )   { baseButton = 5; }
+  else if ( m_button->clicked(CROSS) )    { baseButton = 6; }
+  else if ( m_button->clicked(SQUARE) )   { baseButton = 7; }
+  else {
+    return baseButton;
+  }
+
+  // ----------------------------------
+  // Look for pressed modifier buttons.
+  // ----------------------------------
+
+  int modifier = 0;
+
+  if ( m_button->pressed(L1) || 
+       m_button->pressed(R1) )      { modifier = 8;  }
+  else if ( m_button->pressed(L4) ) { modifier = 16; }
+  else if ( m_button->pressed(R4) ) { modifier = 24; }
+  else if ( m_button->pressed(PS) ) { modifier = 32; }
+
+  // ----------------------------
+  // Return the calculated index.
+  // ----------------------------
+
+  return ( baseButton + modifier );
 }
 
 // =========================
@@ -869,10 +934,36 @@ void Marcduino::m_volumeMax(void)
 
 void Marcduino::m_runSequence(uint8_t sequenceNumber)
 {
-  uint8_t validationList[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 51, 52, 53, 54, 55, 56, 57 };
-  if ( ! m_inList(sequenceNumber, validationList) ) { return; }
+  #if defined(VERBOSE)
+  if ( m_buttonIndex > -1 ) {
+    output = m_className+F("m_runSequence()");
+    output += F(" - ");
+    output += F("Sequence: "); output += sequenceNumber;
+    printOutput();
+  }
+  #endif
+
+  // -----------------------------------------------
+  // Prevent sending an unsupported sequence number.
+  // -----------------------------------------------
+
+  if ( sequenceNumber < 0 ) {
+    return;
+  } else if ( sequenceNumber > 15 && sequenceNumber < 51 ) {
+    return;
+  } else if ( sequenceNumber > 57 ) {
+    return;
+  }
+
+  // -------------------------------------
+  // Always send the sequence to the dome.
+  // -------------------------------------
 
   m_sendCommand(String(":SE" + m_leftPad(sequenceNumber) + '\r'), &MD_Dome_Serial);
+
+  // --------------------------------------------------
+  // Conditionally send panel and/or sound to the body.
+  // --------------------------------------------------
 
   if ( m_settings[iBodyMaster] == 1 ) {
     switch (sequenceNumber) {
