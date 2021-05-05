@@ -6,22 +6,33 @@
  * Inspired by S.H.A.D.O.W. controller code written by KnightShade
  * Released into the public domain.
  */
-#ifndef _DRIVE_MOTOR_H_
-#define _DRIVE_MOTOR_H_
+#ifndef __BLACBOX_DRIVE_MOTOR_H__
+#define __BLACBOX_DRIVE_MOTOR_H__
 
+#include <Servo.h>
 #include "Controller.h"
 
-extern bool driveEnabled;
-extern bool driveStopped;
-extern byte speedProfile;
-
-#if defined(DEBUG) || defined(TEST_CONTROLLER)
+#if defined(DEBUG)
 extern String output;
 extern void printOutput(void);
 #endif
-
 extern HardwareSerial &DriveSerial;
 
+enum driveMotor_setting_index_e {
+  iMotorDriver,   // 0 - Motor driver.
+  iCommMode,      // 1 - Roboteq communication mode.
+  iDeadMan,       // 2 - Use dead man switch.
+  iDriveLatency,  // 3 - Serial latency.
+  iServoDeadZone, // 4 - Servo dead zone
+  iMixing         // 5 - Tank-style mixing
+};
+
+enum driveMotor_pin_index_e {
+  iDrivePin1,  // 0 - Drive pin #1 (steering/left foot)
+  iDrivePin2,  // 1 - Drive pin #2 (throttle/right foot)
+  iScriptPin,  // 2 - Script pin (Roboteq only)
+  iDeadManPin  // 3 - Dead man switch pin
+};
 
 /* ================================================================================
  *                             Parent Drive Motor Class
@@ -29,13 +40,21 @@ extern HardwareSerial &DriveSerial;
 class DriveMotor
 {
   protected:
-    #if defined(PS5_CONTROLLER)
-    Controller_PS5 * m_controller;
-    #elif defined(PS4_CONTROLLER)
-    Controller_PS4 * m_controller;
-    #else
-    Controller_PS3 * m_controller;
-    #endif
+    Controller * m_controller;
+    int* m_settings;
+    byte* m_pins;
+
+    Joystick_Drive* m_joystick;
+    Button* m_button;
+
+    bool driveEnabled;
+    bool driveStopped;
+    byte speedProfile;
+
+    const int m_servoMin = 0;
+    const int m_servoCenter = 90;
+    const int m_servoMax = 180;
+
     unsigned long m_previousTime;
     int m_throttle;
     int m_input1;
@@ -45,72 +64,46 @@ class DriveMotor
     int m_previousInput2;
 
     bool m_isDeadmanPressed(void);
-    void m_updateSpeedProfile(void);
+    void m_setSpeedProfile(void);
 
     virtual void m_drive(void) {};
     virtual void m_writeScript(void) {};
-
-    #if defined(SBL1360) || defined(SABERTOOTH)
     void m_mixBHD(byte stickX, byte stickY);
-    #endif
-
-    #if defined(RS232)
     void m_serialWrite(String inStr);
-    #endif
 
-    #ifdef DEBUG
+    #if defined(DEBUG)
     String m_className;
     #endif
 
   public:
-    DriveMotor(void);
+    DriveMotor(Controller* pController, const int settings[], const byte pins[]);
     virtual ~DriveMotor(void);
     void begin(void);
     void interpretController(void);
     virtual void stop(void) {};
 };
 
-#if defined(SBL2360) || defined(SBL1360)
 /* ================================================================================
  *                           Roboteq SBL2360 or SBL1360
  * ================================================================================ */
-#if defined(PULSE)
-#include <Servo.h>
-#endif
-
-class Roboteq_DriveMotor : public DriveMotor
+class DriveMotor_Roboteq : public DriveMotor
 {
-  private:
-    #if defined(PULSE)
+  protected:
     Servo m_pulse1Signal;
     Servo m_pulse2Signal;
     Servo m_scriptSignal;
-    #endif
+
+    void m_mapInputs(int steering, int throttle);
+    void m_writePulse(int input1, int input2);
+    void m_writePulse(int input);
 
     virtual void m_drive(void);
     virtual void m_writeScript(void);
 
-    #if defined(SBL2360)
-    void m_mapInputs(int steering, int throttle);
-    #endif
-
-    #if defined(PULSE)
-    void m_writePulse(int input1, int input2);
-    void m_writePulse(int input);
-    #endif
-
   public:
-    #if defined(PS5_CONTROLLER)
-    Roboteq_DriveMotor(Controller_PS5 * pController);
-    #elif defined(PS4_CONTROLLER)
-    Roboteq_DriveMotor(Controller_PS4 * pController);
-    #else
-    Roboteq_DriveMotor(Controller_PS3 * pController);
-    #endif
-    virtual ~Roboteq_DriveMotor(void);
+    DriveMotor_Roboteq(Controller* pController, const int settings[], const byte pins[]);
+    virtual ~DriveMotor_Roboteq(void);
     void begin(void);
     virtual void stop(void);
 };
-#endif
-
 #endif

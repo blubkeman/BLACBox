@@ -9,47 +9,40 @@
 #include <Arduino.h>
 #include "DriveMotor.h"
 
+const int ROBOTEQ_BAUD_RATE = 115200;     // I strongly recommend not changing this.
 
-#if defined(SBL2360) || defined(SBL1360)
+
 /* ================================================================================
  *                         Roboteq Motor Controller Class
  * ================================================================================ */
 
-#if defined(RS232)
-const int ROBOTEQ_BAUD_RATE = 115200;     // I strongly recommend not changing this.
-#endif
-
 // =====================
 //      Constructor
 // =====================
-#if defined(PS5_CONTROLLER)
-Roboteq_DriveMotor::Roboteq_DriveMotor(Controller_PS5 * pController) : DriveMotor()
-#elif defined(PS4_CONTROLLER)
-Roboteq_DriveMotor::Roboteq_DriveMotor(Controller_PS4 * pController) : DriveMotor()
-#else
-Roboteq_DriveMotor::Roboteq_DriveMotor(Controller_PS3 * pController) : DriveMotor()
-#endif
+DriveMotor_Roboteq::DriveMotor_Roboteq(
+    Controller* pController,
+    const int settings[],
+    const byte pins[])
+  : DriveMotor(pController, settings, pins)
 {
-  m_controller = pController;
-
   // ----------
   // Debugging.
   // ----------
 
-  #ifdef DEBUG
-  m_className = "Roboteq_DriveMotor::";
+  #if defined(DEBUG)
+  m_className = "DriveMotor_Roboteq::";
   #endif
 }
 
 // ====================
 //      Destructor
 // ====================
-Roboteq_DriveMotor::~Roboteq_DriveMotor(void) {}
+DriveMotor_Roboteq::~DriveMotor_Roboteq(void) {}
 
 // =================
 //      begin()
 // =================
-void Roboteq_DriveMotor::begin(void)
+void DriveMotor_Roboteq::begin(void)
 {
   // -----------------------------------------------------------------------------
   // Call the parent class's begin(). It establishes our dead man switch, if used.
@@ -61,27 +54,36 @@ void Roboteq_DriveMotor::begin(void)
   // Start communication with the Roboteq.
   // -------------------------------------
 
-  #if defined(PULSE)
+  m_scriptSignal.attach(m_pins[iScriptPin]);
 
-  m_pulse1Signal.attach(PULSE1_PIN);
-  m_pulse1Signal.write(SERVO_CENTER);
+  if ( m_settings[iCommMode] == 0 ) {
 
-  m_pulse2Signal.attach(PULSE2_PIN);
-  m_pulse2Signal.write(SERVO_CENTER);
+    // Pulse mode
 
-  m_scriptSignal.attach(SCRIPT_PIN);
+    m_pulse1Signal.attach(m_pins[iDrivePin1]);
+    m_pulse1Signal.write(m_servoCenter);
 
-  #elif defined(RS232)
+    m_pulse2Signal.attach(m_pins[iDrivePin2]);
+    m_pulse2Signal.write(m_servoCenter);
 
-  DriveSerial.begin(ROBOTEQ_BAUD_RATE);
+  } else if ( m_settings[iCommMode] == 1 ) {
 
-  #endif
+    // RS232 (Serial) mode
+
+    DriveSerial.begin(ROBOTEQ_BAUD_RATE);
+
+  } else {
+
+    // Unknown communication type setting.
+
+    return;
+  }
 
   // ----------
   // Debugging.
   // ----------
 
-  #ifdef DEBUG
+  #if defined(DEBUG)
   output = m_className+F("begin()");
   output += F(" - ");
   output += F("Roboteq");
@@ -93,7 +95,7 @@ void Roboteq_DriveMotor::begin(void)
 // ================
 //      stop()
 // ================
-void Roboteq_DriveMotor::stop(void)
+void DriveMotor_Roboteq::stop(void)
 {
   // --------------------------------------------------
   // When the motor is already not running, do nothing.
@@ -107,7 +109,7 @@ void Roboteq_DriveMotor::stop(void)
   // Debugging.
   // ----------
 
-  #ifdef DEBUG
+  #if defined(DEBUG)
   output = m_className+F("stop()");
   output += F(" - ");
   output += F("Stop drive motors");
@@ -118,15 +120,24 @@ void Roboteq_DriveMotor::stop(void)
   // Send the stop command.
   // ----------------------
 
-  #if defined(PULSE)
+  if ( m_settings[iCommMode] == 0 ) {
 
-  m_writePulse(SERVO_CENTER);
+    // Pulse mode
 
-  #elif defined(SERIAL)
+    m_writePulse(m_servoCenter);
 
-  m_serialWrite(F("!MS 1_!MS 2\\r"));
+  } else if ( m_settings[iCommMode] == 1 ) {
 
-  #endif
+    // RS232 (Serial) mode
+
+    m_serialWrite(F("!MS 1_!MS 2\\r"));
+
+  } else {
+
+    // Unknown communication type setting.
+
+    return;
+  }
 
   // ------------------------
   // Update the drive status.
@@ -138,21 +149,30 @@ void Roboteq_DriveMotor::stop(void)
 // ===================
 //      m_drive()
 // ===================
-void Roboteq_DriveMotor::m_drive(void)
+void DriveMotor_Roboteq::m_drive(void)
 {
   // ---------------------------------------------------------------------------
   // Get the inputs based on the throttle and steering values from the joystick.
   // ---------------------------------------------------------------------------
 
-  #if defined(SBL2360)
+  if ( m_settings[iMixing] == 0 ) {
 
-  m_mapInputs(m_steering, m_throttle);
+    // Mixing is done by the motor driver.
 
-  #elif defined(SBL1360)
+    m_mapInputs(m_steering, m_throttle);
 
-  m_mixBHD(m_steering, m_throttle);
+  } else if ( m_settings[iMixing] == 1 ) {
 
-  #endif
+    // Mixing is handled by this sketch.
+
+    m_mixBHD(m_steering, m_throttle);
+
+  } else {
+
+    // Unknown mixing setting.
+
+    return;
+  }
 
   // -----------------------------------
   // Do nothing when there is no change.
@@ -166,20 +186,28 @@ void Roboteq_DriveMotor::m_drive(void)
   // Send the values to the Roboteq.
   // -------------------------------
 
-  #if defined(PULSE)
+  if ( m_settings[iCommMode] == 0 ) {
 
-  m_writePulse(m_input1, m_input2);
+    // Pulse mode
 
-  #elif defined(RS232)
+    m_writePulse(m_input1, m_input2);
+  } else if ( m_settings[iCommMode] == 1 ) {
 
-  String cmd = F("!G 1 ");
-  cmd += m_input1;
-  cmd += F("_!G 2 ");
-  cmd += m_input2;
-  cmd += F("\\r");
-  m_serialWrite(cmd);
+    // RS232 (Serial) mode
 
-  #endif
+    String cmd = F("!G 1 ");
+    cmd += m_input1;
+    cmd += F("_!G 2 ");
+    cmd += m_input2;
+    cmd += F("\\r");
+    m_serialWrite(cmd);
+
+  } else {
+
+    // Unknown communication type setting.
+
+    return;
+  }
 
   // ------------------------
   // Update the drive status.
@@ -187,7 +215,7 @@ void Roboteq_DriveMotor::m_drive(void)
 
   driveStopped = false;
 
-  #ifdef DEBUG
+  #if defined(DEBUG)
   output = m_className+F("m_drive()");
   output += F(" - ");
   output += F("Throttle/Steering: ");
@@ -209,53 +237,48 @@ void Roboteq_DriveMotor::m_drive(void)
   m_previousInput2 = m_input2;
 }
 
-#if defined(SBL2360)
 // =======================
 //      m_mapInputs()
 // =======================
-void Roboteq_DriveMotor::m_mapInputs(int steering, int throttle)
+void DriveMotor_Roboteq::m_mapInputs(int steering, int throttle)
 {
   // ----------------------------------------------------------------------
   // Map the stick into the servo value range of 0 to 180 degrees.
   // Invert the throttle signal so that forward is high and reverse is low.
   // ----------------------------------------------------------------------
 
-  m_input1 = map(throttle, JOYSTICK_MIN, JOYSTICK_MAX, SERVO_MAX, SERVO_MIN);
-  m_input2 = map(steering, JOYSTICK_MIN, JOYSTICK_MAX, SERVO_MIN, SERVO_MAX);
+  m_input1 = map(throttle, m_joystick->minValue, m_joystick->maxValue, m_servoMax, m_servoMin);
+  m_input2 = map(steering, m_joystick->minValue, m_joystick->maxValue, m_servoMin, m_servoMax);
 
   // ----------------------------------------------------------------------
   // The check the dead zone once more. This time checking the servo range.
   // ----------------------------------------------------------------------
 
-  if ( abs(m_input1 - SERVO_CENTER) < SERVO_DEAD_ZONE ) {
-    m_input1 = SERVO_CENTER;
+  if ( abs(m_input1 - m_servoCenter) < m_settings[iServoDeadZone] ) {
+    m_input1 = m_servoCenter;
   }
-  if ( abs(m_input2 - SERVO_CENTER) < SERVO_DEAD_ZONE ) {
-    m_input2 = SERVO_CENTER;
+  if ( abs(m_input2 - m_servoCenter) < m_settings[iServoDeadZone] ) {
+    m_input2 = m_servoCenter;
   }
 }
-#endif
 
-#if defined(PULSE)
 // ========================
 //      m_writePulse()
 // ========================
-void Roboteq_DriveMotor::m_writePulse(int input1, int input2)
+void DriveMotor_Roboteq::m_writePulse(int input1, int input2)
 {
   m_pulse1Signal.write(input1);
   m_pulse2Signal.write(input2);
 }
-void Roboteq_DriveMotor::m_writePulse(int input)
+void DriveMotor_Roboteq::m_writePulse(int input)
 {
   m_writePulse(input, input);
 }
-#endif
 
 // ===============================
 //      m_writeScript()
 // ===============================
-void Roboteq_DriveMotor::m_writeScript(void)
+void DriveMotor_Roboteq::m_writeScript(void)
 {
   m_scriptSignal.write(speedProfile);
 }
-#endif

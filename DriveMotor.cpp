@@ -16,8 +16,15 @@
 // =====================
 //      Constructor
 // =====================
-DriveMotor::DriveMotor(void)
+DriveMotor::DriveMotor(Controller* pController, const int settings[], const byte pins[])
 {
+  m_controller = pController;
+  m_settings   = settings;
+  m_pins       = pins;
+
+  m_joystick = &m_controller->driveStick;
+  m_button = &m_controller->button;
+
   driveEnabled = true;
   driveStopped = true;
   speedProfile = WALK;
@@ -26,7 +33,7 @@ DriveMotor::DriveMotor(void)
   // Debugging.
   // ----------
 
-  #ifdef DEBUG
+  #if defined(DEBUG)
   m_className = F("DriveMotor::");
   #endif
 }
@@ -45,11 +52,11 @@ void DriveMotor::begin()
   // Set up a deadman switch, or not.
   // --------------------------------
 
-  pinMode(DEADMAN_PIN,OUTPUT);
+  pinMode(m_pins[iDeadManPin],OUTPUT);
 
-  #if defined(DEADMAN)
+  if ( m_settings[iDeadMan] ) {
 
-    #ifdef DEBUG
+    #if defined(DEBUG)
     output = m_className+F("begin()");
     output += F(" - ");
     output += F("Dead man switch");
@@ -57,11 +64,11 @@ void DriveMotor::begin()
     printOutput();
     #endif
   
-    digitalWrite(DEADMAN_PIN,LOW);
+    digitalWrite(m_pins[iDeadManPin],LOW);
 
-  #else
+  } else {
 
-    #ifdef DEBUG
+    #if defined(DEBUG)
     output = m_className+F("begin()");
     output += F(" - ");
     output += F("Dead man switch");
@@ -69,9 +76,9 @@ void DriveMotor::begin()
     printOutput();
     #endif
   
-    digitalWrite(DEADMAN_PIN,HIGH);
+    digitalWrite(m_pins[iDeadManPin],HIGH);
 
-  #endif
+  }
 }
 
 // ===============================
@@ -84,7 +91,7 @@ void DriveMotor::interpretController(void)
   // -------------------------------------------------
   
   if ( m_controller->connectionStatus() == NONE ) {
-    #ifdef DEBUG
+    #if defined(DEBUG)
     output = m_className+F("interpretController()");
     output += F(" - ");
     output += F("No controller");
@@ -97,25 +104,20 @@ void DriveMotor::interpretController(void)
   // Look for a change in the speed profile.
   // ---------------------------------------
 
-  if ( DRIVE_STICK == 0 ) {
-    if ( m_controller->getButtonPress(L1) && m_controller->getButtonClick(L3) ) {
-      m_updateSpeedProfile();
-    }
-  } else if ( DRIVE_STICK == 1 ) {
-    if ( m_controller->getButtonPress(R1) && m_controller->getButtonClick(R3) ) {
-      m_updateSpeedProfile();
-    }
+  if ( (m_joystick->side == 0 && m_button->pressed(L1) && m_button->pressed(L3)) ||
+       (m_joystick->side == 1 && m_button->pressed(R1) && m_button->pressed(R3)) ) {
+    m_setSpeedProfile();
   }
 
   // -----------------------------------
   // Look for disabling the drive stick.
   // -----------------------------------
 
-  if ( m_controller->getButtonPress(PS) || m_controller->getButtonPress(PS2) ) {
+  if ( m_button->pressed(PS) || m_button->pressed(PS2) ) {
 
-    if ( driveEnabled && m_controller->getButtonPress(4) ) {
+    if ( driveEnabled && m_button->pressed(L4) ) {
 
-      #ifdef DEBUG
+      #if defined(DEBUG)
       output = m_className+F("interpretController()");
       output += F(" - ");
       output += F("Drive motor");
@@ -126,9 +128,9 @@ void DriveMotor::interpretController(void)
       driveEnabled = false;
       m_controller->setLed();
 
-    } else if ( ! driveEnabled && m_controller->getButtonPress(5) ) {
+    } else if ( ! driveEnabled && m_button->pressed(R4) ) {
       
-      #ifdef DEBUG
+      #if defined(DEBUG)
       output = m_className+F("interpretController()");
       output += F(" - ");
       output += F("Drive motor");
@@ -167,64 +169,37 @@ void DriveMotor::interpretController(void)
   // ------------------------------------------------------------------------
 
   unsigned long currentTime = millis();
-  if ( (currentTime - m_previousTime) <= SERIAL_LATENCY ) {
+  if ( (currentTime - m_previousTime) <= m_settings[iDriveLatency] ) {
     return;
   }
   m_previousTime = currentTime;
+
+  // -------------------------------------------------------
+  // When pressing L1|R1, we anticipate L3|R3 to be pressed.
+  // Skip reading the joystick in this case.
+  // -------------------------------------------------------
+
+  if ( (m_joystick->side == 0 && m_button->pressed(L1)) ||
+       (m_joystick->side == 1 && m_button->pressed(R1)) ) {
+    return;
+  }
 
   // ---------------------------------------------------------------
   // Get the drive joystick steering (X) and throttle (Y) positions.
   // ---------------------------------------------------------------
 
-  if ( DRIVE_STICK == 0 ) {
-
-    // ------------------------------------------------------------------------------
-    // Get input from the left stick (or PS3 Nav primary controller).
-    // Skip this when L1 is pressed. This anticipates pressing L1+L3 to change speed.
-    // ------------------------------------------------------------------------------
-
-    if ( m_controller->getButtonPress(L1) ) {
-      return;
-    }
-    m_steering = m_controller->getAnalogHat(LeftHatX);  // Returns the x-axis position of the joystick (range 0-255)
-    m_throttle = m_controller->getAnalogHat(LeftHatY);  // Returns the y-axis position of the joystick (range 0-255)
-
-  } else if ( DRIVE_STICK == 1 ) {
-
-    // ------------------------------------------------------------------------------
-    // Get input from the right stick (or PS3 Nav optional controller).
-    // Skip this when R1 is pressed. This anticipates pressing R1+R3 to change speed.
-    // ------------------------------------------------------------------------------
-
-    if ( m_controller->getButtonPress(R1) ) {
-      return;
-    }
-    #if defined(PS3_NAVIGATION)
-    m_steering = m_secondController->getAnalogHat(LeftHatX);  // Returns the x-axis position of the joystick (range 0-255)
-    m_throttle = m_secondController->getAnalogHat(LeftHatY);  // Returns the y-axis position of the joystick (range 0-255)
-    #else
-    m_steering = m_controller->getAnalogHat(RightHatX);  // Returns the x-axis position of the joystick (range 0-255)
-    m_throttle = m_controller->getAnalogHat(RightHatY);  // Returns the y-axis position of the joystick (range 0-255)
-    #endif
-
-  } else {
-
-    // -------------------------------------
-    // Do nothing when our settings are bad.
-    // -------------------------------------
-
-    return;
-  }
+  m_steering = m_joystick->steering();
+  m_throttle = m_joystick->throttle();
 
   // -----------------------------------------------------------
   // A stick within its dead zone is treated the same as center.
   // -----------------------------------------------------------
   
-  if ( abs(m_steering - JOYSTICK_CENTER) < JOYSTICK_DEAD_ZONE ) {
-    m_steering = JOYSTICK_CENTER;
+  if ( abs(m_steering - m_joystick->center) < m_joystick->deadZone ) {
+    m_steering = m_joystick->center;
   }
-  if ( abs(m_throttle - JOYSTICK_CENTER) < JOYSTICK_DEAD_ZONE ) {
-    m_throttle = JOYSTICK_CENTER;
+  if ( abs(m_throttle - m_joystick->center) < m_joystick->deadZone ) {
+    m_throttle = m_joystick->center;
   }
 
   // -------------------------------------------
@@ -232,7 +207,7 @@ void DriveMotor::interpretController(void)
   // Otherwise, send the drive command.
   // -------------------------------------------
 
-  if ( m_steering == JOYSTICK_CENTER && m_throttle == JOYSTICK_CENTER ) {
+  if ( m_steering == m_joystick->center && m_throttle == m_joystick->center ) {
     stop();
   } else {
     m_drive();
@@ -240,62 +215,51 @@ void DriveMotor::interpretController(void)
 }
 
 // ================================
-//      m_updateSpeedProfile()
+//      m_setSpeedProfile()
 // ================================
-void DriveMotor::m_updateSpeedProfile(void)
+void DriveMotor::m_setSpeedProfile(void)
 {
-  #if ( (defined(SBL2360) || defined(SBL1360)) && (defined(PS3_CONTROLLER) || defined(PS4_CONTROLLER) || defined(PS5_CONTROLLER)) )
+  if ( m_settings[iMotorDriver] == 0 && m_controller->getType() > 0 ) {
+    
+    // ---------------------------------------------------------------------
+    // For PS3, PS4, and PS5 controllers using the Roboteq motor controller,
+    // the full spectrum of speed profiles is available. Cycle through it.
+    // ---------------------------------------------------------------------
 
-  // ---------------------------------------------------------------------
-  // For PS3, PS4, and PS5 controllers using the Roboteq motor controller,
-  // the full spectrum of speed profiles is available. Cycle through it.
-  // ---------------------------------------------------------------------
+    if ( speedProfile == SPRINT ) {
+      speedProfile = WALK;
+    } else {
+      speedProfile++;
+    }
 
-  if ( speedProfile == SPRINT ) {
-    speedProfile = WALK;
   } else {
-    speedProfile++;
+
+    // -----------------------------------------------------------
+    // For all other controllers, only two profiles are available.
+    // -----------------------------------------------------------
+
+    if ( speedProfile == RUN ) {
+      speedProfile = WALK;
+    } else {
+      speedProfile = RUN;
+    }
+
   }
-
-  #else
-
-  // -----------------------------------------------------------
-  // For all other controllers, only two profiles are available.
-  // -----------------------------------------------------------
-
-  if ( speedProfile == RUN ) {
-    speedProfile = WALK;
-  } else {
-    speedProfile = RUN;
-  }
-
-  #endif
 
   m_controller->setLed();
   m_writeScript();
 
-  #ifdef DEBUG
-  output = m_className+F("m_updateSpeedProfile()");
+  #if defined(DEBUG)
+  output = m_className+F("m_setSpeedProfile()");
   output += F(" - ");
   output += F("Speed profile set to: ");
   switch (speedProfile) {
-    case WALK: {
-      output += F("WALK");
-      break;
-    }
-    case JOG: {
-      output += F("JOG");
-      break;
-    }
-    case RUN: {
-      output += F("RUN");
-      break;
-    }
-    case SPRINT: {
-      output += F("SPRINT");
-      break;
-    }
-  }
+    case WALK:   { output += F("Walk");   break; }
+    case JOG:    { output += F("Jog");    break; }
+    case RUN:    { output += F("Run");    break; }
+    case SPRINT: { output += F("Sprint"); break; }
+    default:     { output += F("Unknown"); }
+  };
   printOutput();
   #endif
 }
@@ -310,7 +274,7 @@ bool DriveMotor::m_isDeadmanPressed(void)
   // varies a little for different controllers.
   // ---------------------------------------------
 
-  #if defined(PS3_NAVIGATION)
+  if ( m_controller->getType() == 0) {
 
     if ( m_controller->connectionStatus() == FULL ) {
 
@@ -318,11 +282,11 @@ bool DriveMotor::m_isDeadmanPressed(void)
       // We have dual Nav controllers. L2 or R2 is the deadman switch.
       // -------------------------------------------------------------
 
-      if ( m_controller->getButtonPress(L2) || m_controller->getButtonPress(R2) ) {
-        digitalWrite(DEADMAN_PIN, HIGH);
+      if ( m_button->pressed(L2) || m_button->pressed(R2) ) {
+        digitalWrite(m_pins[iDeadMan], HIGH);
         return true;
       } else {
-        digitalWrite(DEADMAN_PIN, LOW);
+        digitalWrite(m_pins[iDeadMan], LOW);
         return false;
       }
 
@@ -332,31 +296,31 @@ bool DriveMotor::m_isDeadmanPressed(void)
       // We have a single Nav controller. L1 is the deadman switch.
       // ----------------------------------------------------------
 
-      if ( m_controller->getButton(L1) ) {
-        digitalWrite(DEADMAN_PIN, HIGH);
+      if ( m_button->pressed(L1) ) {
+        digitalWrite(m_pins[iDeadMan], HIGH);
         return true;
       } else {
-        digitalWrite(DEADMAN_PIN, LOW);
+        digitalWrite(m_pins[iDeadMan], LOW);
         return false;
       }
 
     }
 
-  #elif defined(PS3_CONTROLLER) || defined(PS4_CONTROLLER) || defined(PS5_CONTROLLER)
+  } else if ( m_controller->getType() > 0 ) {
 
     // -----------------------------------------------------------------
     // For PS3, PS4, or PS5 controllers, L2 or R2 is the deadman switch.
     // -----------------------------------------------------------------
 
-    if ( m_controller->getButtonPress(L2) || m_controller->getButtonPress(R2) ) {
-      digitalWrite(DEADMAN_PIN, HIGH);
+    if ( m_button->pressed(L2) || m_button->pressed(R2) ) {
+      digitalWrite(m_pins[iDeadMan], HIGH);
       return true;
     } else {
-      digitalWrite(DEADMAN_PIN, LOW);
+      digitalWrite(m_pins[iDeadMan], LOW);
       return false;
     }
 
-  #else
+  } else {
 
     // -------------------------------------------------------
     // We do not have a controller for which code is prepared.
@@ -364,10 +328,9 @@ bool DriveMotor::m_isDeadmanPressed(void)
 
     return false;
 
-  #endif
+  }
 }
 
-#if defined(SBL1360) || defined(SABERTOOTH)
 // ====================
 //      m_mixBHD()
 // ====================
@@ -381,10 +344,10 @@ void DriveMotor::m_mixBHD(byte stickX, byte stickY) {
  *   SHADOW_MD_Q85 code.
  * ============================================================= */
 
-  if ( stickX == JOYSTICK_CENTER && stickY == JOYSTICK_CENTER ) {
+  if ( stickX == m_joystick->center && stickY == m_joystick->center ) {
 
-    m_input1=SERVO_CENTER;
-    m_input2=SERVO_CENTER;
+    m_input1=m_servoCenter;
+    m_input2=m_servoCenter;
     return;
 
   }
@@ -392,16 +355,16 @@ void DriveMotor::m_mixBHD(byte stickX, byte stickY) {
   int xInt = 0;
   int yInt = 0;
 
-  if (stickY < JOYSTICK_CENTER) {
-    yInt = map(stickY, JOYSTICK_MIN, (JOYSTICK_CENTER - JOYSTICK_DEAD_ZONE), 100, 1);
+  if (stickY < m_joystick->center) {
+    yInt = map(stickY, m_joystick->minValue, (m_joystick->center - m_joystick->deadZone), 100, 1);
   } else {
-    yInt = map(stickY, (JOYSTICK_CENTER + JOYSTICK_DEAD_ZONE), JOYSTICK_MAX, -1, -100);
+    yInt = map(stickY, (m_joystick->center + m_joystick->deadZone), m_joystick->maxValue, -1, -100);
   }
 
-  if (stickX < JOYSTICK_CENTER) {
-    xInt = map(stickX, JOYSTICK_MIN, (JOYSTICK_CENTER - JOYSTICK_DEAD_ZONE), -100, -1);
+  if (stickX < m_joystick->center) {
+    xInt = map(stickX, m_joystick->minValue, (m_joystick->center - m_joystick->deadZone), -100, -1);
   } else {
-    xInt = map(stickX, (JOYSTICK_CENTER + JOYSTICK_DEAD_ZONE), JOYSTICK_MAX, 1, 100);
+    xInt = map(stickX, (m_joystick->center + m_joystick->deadZone), m_joystick->maxValue, 1, 100);
   }
 
   float xFloat = xInt;
@@ -427,12 +390,10 @@ void DriveMotor::m_mixBHD(byte stickX, byte stickY) {
   float rightSpeed = ((yFloat - xFloat - 100) / 2) + 100;
   rightSpeed = (rightSpeed - 50) * 2;
 
-  m_input1=map(leftSpeed, -100, 100, SERVO_MAX, SERVO_MIN);
-  m_input2=map(rightSpeed, -100, 100, SERVO_MAX, SERVO_MIN);
+  m_input1=map(leftSpeed, -100, 100, m_servoMax, m_servoMin);
+  m_input2=map(rightSpeed, -100, 100, m_servoMax, m_servoMin);
 }
-#endif
 
-#if defined(RS232)
 // =======================
 //      m_serialWrite()
 // =======================
@@ -444,4 +405,3 @@ void DriveMotor::m_serialWrite(String inStr)
     }
   }
 }
-#endif

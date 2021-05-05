@@ -1,27 +1,26 @@
 /* =================================================================================
  *    B.L.A.C.Box: Brian Lubkeman's Astromech Controller
  * =================================================================================
- * Controller_PS4.cpp - Library for PS4 controllers
- * Created by Brian Lubkeman, 23 March 2021
+ * Controller_PS4.cpp - Library for supported controllers
+ * Created by Brian Lubkeman, 4 May 2021
  * Inspired by S.H.A.D.O.W. controller code written by KnightShade
  * Released into the public domain.
  */
 #include <Arduino.h>
 #include "Controller.h"
 
-
-#if defined(PS4_CONTROLLER)
 /* ================================================================================
  *                                  PS4 Controller
  * ================================================================================ */
 
-
 // =====================
 //      Constructor
 // =====================
-Controller_PS4::Controller_PS4(void) : Controller_Wrapper(), m_controller(&m_Btd)
+Controller_PS4::Controller_PS4(int settings[])
+  : Controller(settings),
+    m_controller(&m_Btd)
 {
-  #ifdef DEBUG
+  #if defined(DEBUG)
   m_className = "Controller_PS4::";
   #endif
 }
@@ -40,7 +39,7 @@ void Controller_PS4::begin(void)
   // Call the parent class begin() to start the USB Host Shield.
   // -----------------------------------------------------------
 
-  Controller_Wrapper::begin();
+  Controller::begin();
 
   // ------------------------
   // Set up the onInit event.
@@ -53,12 +52,18 @@ void Controller_PS4::begin(void)
   // Debugging.
   // ----------
 
-  #ifdef DEBUG
+  #if defined(DEBUG)
   output = m_className+F("begin()");
   output += F(" - ");
   output += F("Ready to connect a");
   output += F(" PS4");
   output += F(" controller");
+
+  displayInit();
+  output += F("\n  Drive stick:   ");
+  driveStick.displayInit();
+  output += F("\n  Dome stick:    ");
+  domeStick.displayInit();
   printOutput();
   #endif
 }
@@ -84,7 +89,7 @@ void Controller_PS4::m_connect(void)
 
   if ( ! connected() ) {
 
-    #ifdef DEBUG
+    #if defined(DEBUG)
     output = m_className+F("m_connect()");
     output += F(" - ");
     output += F("Controller");
@@ -125,15 +130,12 @@ void Controller_PS4::m_connect(void)
   // Debugging.
   // ----------
 
-  #ifdef DEBUG
+  #if defined(DEBUG)
   if ( connectionStatus() > NONE ) {
     output = m_className+F("m_connect()");
     output += F(" - ");
     output += F("Controller");
     output += F(" connected");
-    output += F("\nBattery: ");
-    output += (int)(m_controller.getBatteryLevel()/15)*100;
-    output += F("%");
     printOutput();
   }
   #endif
@@ -148,7 +150,7 @@ void Controller_PS4::m_disconnect(void)
   m_controller.disconnect();
   m_setConnectionStatus(NONE);
 
-  #ifdef DEBUG
+  #if defined(DEBUG)
   output = m_className+F("m_disconnect()");
   output += F(" - ");
   output += F("Controller disconnected");
@@ -181,6 +183,14 @@ void Controller_PS4::setLed(void)
         m_controller.setLed(Purple);
         break;
       }
+      default: {
+        #if defined(DEBUG)
+        output = m_className+F("setLed()");
+        output += F(" - ");
+        output += F("Speed profile unknown");
+        printOutput();
+        #endif
+      }
     }
   }
 }
@@ -194,7 +204,7 @@ bool Controller_PS4::m_getUsbStatus(void)
 }
 
 // =====================
-//      m_connected
+//      connected()
 // =====================
 bool Controller_PS4::connected(void)
 {
@@ -220,9 +230,9 @@ bool Controller_PS4::read()
   // Look for user-requested disconnect.
   // -----------------------------------
 
-  if ( getButtonPress(PS) && ( getButtonPress(L2) || getButtonPress(R2) ) ) {
+  if ( button.pressed(PS) && ( button.pressed(L2) || button.pressed(R2) ) ) {
 
-    #ifdef DEBUG
+    #if defined(DEBUG)
     output = F("\n");
     output += m_className+F("read()");
     output += F(" - ");
@@ -233,13 +243,12 @@ bool Controller_PS4::read()
     m_disconnect();
   }
 
-  #ifdef TEST_CONTROLLER
+  #if defined(TEST_CONTROLLER)
   //--------------------------
   // Testing controller input.
-  // Uncomment only one of these at a time.
   //--------------------------
-  m_displayInput();
-  //m_scrollInput();
+  m_displayInput();   // Uncomment only one of these at a time.
+  //m_scrollInput();  // Uncomment only one of these at a time.
   #endif
 
   // -------------
@@ -256,16 +265,19 @@ bool Controller_PS4::getButtonClick(int buttonEnum) { return m_controller.getBut
 bool Controller_PS4::getButtonPress(int buttonEnum) { return m_controller.getButtonPress(buttonEnum); };
 int Controller_PS4::getAnalogButton(int buttonEnum) { return m_controller.getAnalogButton(buttonEnum); };
 int Controller_PS4::getAnalogHat(int stickEnum)  { return m_controller.getAnalogHat(stickEnum); }
+
+// ================================
+//      m_getModifierButtons()
+// ================================
 int Controller_PS4::m_getModifierButtons(void)
 {
   int modifier = 0;
 
-  if ( getButtonPress(L1) || 
-       getButtonPress(R1) )           { modifier = 8;  }
-  else if ( getButtonPress(SHARE) )   { modifier = 16; }
-  else if ( getButtonPress(OPTIONS) ) { modifier = 24; }
-  else if ( getButtonPress(PS) )      { modifier = 32; }
+  if ( button.pressed(L1) || 
+       button.pressed(R1) )           { modifier = 8;  }
+  else if ( button.pressed(SHARE) )   { modifier = 16; }
+  else if ( button.pressed(OPTIONS) ) { modifier = 24; }
+  else if ( button.pressed(PS) )      { modifier = 32; }
 
   return modifier;
 }
-#endif

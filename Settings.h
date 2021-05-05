@@ -2,165 +2,96 @@
  *    B.L.A.C.Box: Brian Lubkeman's Astromech Controller
  * =================================================================================
  * Settings.h - Library for user settings
- * Created by Brian Lubkeman, 23 March 2021
+ * Created by Brian Lubkeman, 4 May 2021
  * Inspired by S.H.A.D.O.W. controller code written by KnightShade
  * Released into the public domain.
  */
-#ifndef _SETTINGS_H_
-#define _SETTINGS_H_
-
-
-// ========================================
-//           Debug & Testing Modes
-// ========================================
-#define DEBUG               // Uncomment to enable Serial monitor debugging.
-//#define TEST_CONTROLLER     // Uncomment to enable display of controller buttons pressed.
+#ifndef __BLACBOX_SETTINGS_H__
+#define __BLACBOX_SETTINGS_H__
 
 
 // ========================================
 //            Controller Settings
 // ========================================
 
-// Uncomment one of the following lines that represent
-// which type of controller you will be using.
-
-//#define PS5_CONTROLLER
-#define PS4_CONTROLLER
-//#define PS3_CONTROLLER
-//#define PS3_NAVIGATION
-
-// Update this constant with the number of peripherals
-// that have been enabled. The drive system, dome motor,
-// and Marcduino system are the current peripherals.
-
-const byte NUMBER_OF_PERIPHERALS = 2;
+const int controllerSettings[] = {
+   2      // controller type         : 0=PS3 Nav, 1=PS3, 2=PS4, 3=PS5
+ , 0      // drive stick side        : 0=left; 1=right
+ , 1      // dome stick side         : 0=left; 1=right
+ , 8      // joystick dead zone      : joystick center +/- this number will be treated as center
+ , 300    // lag time to kill motors : Kill motors when lag exceeds 0.3 seconds.
+ , 10000  // lag time to disconnect  : Disconnect controller when lag exceeds 10 seconds.
+ , 200    // lag time to reconnect   : Reconnect controller when lag exceed 0.2 seconds.
+ , 15     // plugged short interval  : Part of critical fault detection.
+ , 100    // plugged long interval   : Part of critical fault detection.
+ , 3      // number of peripherals   : 1-3; Used when processing a disconnect event
+};
 
 // ========================================
 //           Drive System Settings
 // ========================================
 
-// Uncomment one of the following lines that represents the Roboteq
-// motor controller you will be using for the drive system.
+const int driveMotorSettings[] = {
+  0,  // Motor driver               : 0=Roboteq SBL2360 or SBL1360, 1=Sabertooth
+  0,  // Roboteq communication mode : 0=Pulse, 1=RS232 (Serial)
+  1,  // Use dead man switch        : 0=false, 1=true
+  25, // Serial latency (in ms)     : 25 ms for HardwareSerial, 50+ ms for SoftwareSerial
+  7,  // Servo dead zone            : Similar to joystick dead zone, but for the servo numerical range
+  0   // Tank-style drive mixing    : 0=false (for SBL2360), 1=true (for SBL1360 or Sabertooth)
+};
 
-#define SBL2360
-//#define SBL1360
+// Set your pins here. (PWM pins on the Arduino Mega include pins 2-13 and 44-46.)
 
-// Uncomment one of the following lines that represents the
-// input mode of the Roboteq motor controller.
-
-#define PULSE
-//#define RS232
-
-// Uncomment the following line if you are using a dead
-// man switch with the drive system.
-
-#define DEADMAN
-
-// Choose which stick controls your drive system.
-// Configure the following ONLY when using a PS3 or PS4 controller.
-// DO NOT configure the following when using a PS3 Move Navigation.
-
-const byte DRIVE_STICK = 0;     // This is the left stick (or PS3 Nav primary stick).
-//const byte DRIVE_STICK = 1;   // This is the right stick (or PS3 Nav optional stick).
+const byte driveMotorPins[] = {
+  44,     // Drive pin #1 - Pulse1/Throttle (Roboteq) or Left foot (Sabertooth).
+  45,     // Drive pin #2 - Pulse2/Steering (Roboteq) or Right foot (Sabertooth).
+  46,     // Script pin   - Pulse3/Script (Roboteq only).
+  47      // Deadman pin  - Digital pin for dead man switch.
+};
 
 // ========================================
-//           Dome Motor Settings
+//              Dome Settings
 // ========================================
 
-// Currently, only the Syren10 motor controller is supported.
-// Comment this line out only if you do not use a dome motor.
+const byte domeMotorSettings[] = {
+  0,      // Motor driver  :  0=Syren10, no other driver supported yet
+  100,    // If using a speed controller for the dome, this sets the top speed. Use a number up to 127 for serial.
+  100,    // Speed used when dome automation is active (1-127)
+  49,     // Minimum auto dome speed to allow automation to run.
+  101,    // Maximum auto dome speed to allow automation to run.
+  1,      // Invert turn direction. Set to -1 if inversion is needed.
+  25      // Serial latency (in ms)  :  25 ms for HardwareSerial, 50+ ms for SoftwareSerial
+};
 
-#define SYREN10
+const unsigned long domeMotorTimings[] = {
+  2000,   // Milliseconds for dome to complete 360 turn at m_settings[iAutoSpeed]
+  1999,   // Minimum time allowed for dome to complete a full 360 turn.
+  8001    // Maximum time allowed for dome to complete a full 360 turn.
+};
 
-// Modify these settings as appropriate for your system.
-
-const byte DOME_SPEED = 100;              // If using a speed controller for the dome, this sets the top speed
-                                          // Use a number up to 127 for serial.
-const unsigned long TIME_360_DOME_TURN = 2000;      // Milliseconds for dome to complete 360 turn at DOME_AUTO_SPEED
-const unsigned long TIME_360_DOME_TURN_MIN = 1999;  // Minimum time allowed for dome to complete a full 360 turn.
-const unsigned long TIME_360_DOME_TURN_MAX = 8001;  // Maximum time allowed for dome to complete a full 360 turn.
-                                          // Cut in half to reduce spin.  Offset for different rotation startups due to gearing.
-const byte DOME_AUTO_SPEED = 100;         // Speed used when dome automation is active (1-127)
-const byte DOME_AUTO_SPEED_MIN = 49;      // Minimum auto dome speed to allow automation to run.
-const byte DOME_AUTO_SPEED_MAX = 101;     // Maximum auto dome speed to allow automation to run.
-
-//const int INVERT_TURN_DIRECTION = -1;     // This may need to be set to 1 for some configurations
+const int syrenSettings[] = {
+  129,    // Syren10 address. : Values 128-135 allowed.  129 is typical.
+  9600    // Syren10 baud rate.  DO NOT CHANGE THIS.
+};
 
 // ========================================
 //            Marcduino Settings
 // ========================================
 
-#define MARCDUINO         // Uncomment this line if you are using at least one Marcduino master board.
 
-#if defined(MARCDUINO)
+const byte marcduinoSettings[] = {
+  0,    // FX control system           : 0=Marcduino, no other system supported yet
+  1,    // Marcduino body master used  : 0=false, 1=true
+  1,    // Marcduino sound master      : 0=dome, 1=body
+  0,    // Marcduino command set       : 0=standard SHADOW+MD, 1=custom
+  0,    // Sound board                 : 0=Sparkfun MP3 Trigger, 1=CF III
+  0,    // Magic panel used            : 0=false, 1=true
+  2,    // Body panels on servos       : 
+  10,   // Dome panels on servos       : 
+  3,    // Holoprojectors on servos    : 
+  2,    // HP automation delay min     : Specify in seconds. Minimum time between automated holoprojector movements.
+  10,   // HP automation delay max     : Specify in seconds. Maximum time between automated holoprojector movements.
+  0     // Feather radio used          : 0=false, 1=true
+};
 
-#define MD_BODY_MASTER    // Uncomment this line if you are using the optional Marcduino body master.
-//#define MD_CUSTOM_CMDS  // Uncomment this line if you define your own custom mappings in Settings_Marcduino.h.
-
-#if defined(MD_BODY_MASTER)
-#define MD_BODY_SOUND     // Uncomment this line if your body master controls the sound system.
-#endif
-
-#endif
-
-#define MP3_TRIGGER       // Uncomment this line if your sound system uses a Sparkfun MP3 Trigger
-//#define CF_III            // Uncomment this line if your sound system uses a CF III.
-
-//#define MAGIC_PANEL     // Uncomment this line if your dome includes a magic panel.
-
-const byte NUMBER_OF_BODY_PANELS = 2;    // Specify how many body panels are in use. max = 10
-const byte NUMBER_OF_DOME_PANELS = 10;   // Specify how many dome panels are in use. max = 10
-const byte NUMBER_OF_HOLOPROJECTORS = 3; // Specify how many holoprojectors are in use.
-const byte AUTO_HP_DELAY_MIN = 2;        // Specify in seconds. Minimum time between automated holoprojector movements.
-const byte AUTO_HP_DELAY_MAX = 10;       // Specify in seconds. Maximum time between automated holoprojector movements.
-
-// ========================================
-//          Miscellaneous Settings
-// ========================================
-
-// Set your pins here.
-
-#if ( (defined(SBL2360) || defined(SBL1360)) && defined(PULSE) )
-const byte PULSE1_PIN  = 44;
-const byte PULSE2_PIN  = 45;      // PWM pins on the Arduino Mega include pins 2-13 and 44-46.
-const byte SCRIPT_PIN  = 46;
-#elif defined(SABERTOOTH)
-const byte LEFTFOOT_PIN  = 44;
-const byte RIGHTFOOT_PIN = 45;
-#endif
-const byte DEADMAN_PIN = 47;
-
-const int SERIAL_LATENCY = 25;  //This is a delay factor in ms to prevent queueing of the Serial data.
-                                //25ms seems appropriate for HardwareSerial, values of 50ms or larger are needed for Softare Emulation
-
-// ==========================================
-// Please do not change any of the following.
-// ==========================================
-
-// Speed profiles.
-
-const byte WALK =   0;   // MaxSpeed=1400, Accel=12000, Decel=22000
-const byte JOG  =   1;   // MaxSpeed=1600, Accel=16000, Decel=30000
-const byte RUN  =   2;   // MaxSpeed=2400, Accel=16000, Decel=36000
-const byte SPRINT = 3;   // MaxSpeed=3000, Accel=16000, Decel=40000
-
-// Joystick positions.
-
-const int JOYSTICK_MIN       = 0;
-const int JOYSTICK_CENTER    = 128;
-const int JOYSTICK_MAX       = 256;
-const int JOYSTICK_DEAD_ZONE = 8;
-
-// Servo positions.
-
-const int SERVO_MIN       = 0;
-const int SERVO_CENTER    = 90;
-const int SERVO_MAX       = 180;
-const int SERVO_DEAD_ZONE = 7;
-
-// Controller connection statuses.
-
-const byte NONE = 0;
-const byte HALF = 1;  // Applies only to PS3 Move Navigation controllers.
-const byte FULL = 2;
 #endif

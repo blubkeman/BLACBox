@@ -2,7 +2,7 @@
  *    B.L.A.C.Box: Brian Lubkeman's Astromech Controller
  * =================================================================================
  * Controller.cpp - Library for supported controllers
- * Created by Brian Lubkeman, 23 March 2021
+ * Created by Brian Lubkeman, 4 May 2021
  * Inspired by S.H.A.D.O.W. controller code written by KnightShade
  * Released into the public domain.
  */
@@ -10,34 +10,32 @@
 #include "Controller.h"
 #include "Security.h"
 
-
 /* ================================================================================
  *                             Parent Controller Class
  * ================================================================================ */
 
-
 // =====================
 //      Constructor
 // =====================
-Controller_Wrapper::Controller_Wrapper(void) : m_Usb(), m_Btd(&m_Usb)
+Controller::Controller(const int settings[])
+  : m_Usb(),
+    m_Btd(&m_Usb),
+    driveStick(settings[iDriveSide], settings[iDeadZone], this),
+    domeStick(settings[iDomeSide], settings[iDeadZone], this),
+    button(this)
 {
-  m_controllerConnected = NONE;
-  m_disconnectCount = 0;
-
-  #ifdef DEBUG
-  m_className = "Controller_Wrapper::";
-  #endif
+  pSettings = settings;
 }
 
 // ====================
 //      Destructor
 // ====================
-Controller_Wrapper::~Controller_Wrapper(void) {}
+Controller::~Controller(void) {}
 
 // =================
 //      begin()
 // =================
-void Controller_Wrapper::begin(void)
+void Controller::begin(void)
 {
   // -------------------
   // Start the USB host.
@@ -45,17 +43,17 @@ void Controller_Wrapper::begin(void)
 
   if (m_Usb.Init() == -1) {
 
-    #ifdef DEBUG
+    #if defined(DEBUG)
     output = m_className+F("begin()");
     output += F(" - ");
     output += F("OSC did not start");
     printOutput();
     #endif
 
-    while (1); //halt
+    while (1);
   }
 
-  #ifdef DEBUG
+  #if defined(DEBUG)
   output = m_className+F("begin()");
   output += F(" - ");
   output += F("Bluetooth Library Started");
@@ -63,26 +61,55 @@ void Controller_Wrapper::begin(void)
   #endif
 }
 
-// ============================
-//      connectionStatus()
-// ============================
-byte Controller_Wrapper::connectionStatus(void)
+// =======================
+//      displayInit()
+// =======================
+void Controller::displayInit(void)
 {
-  return m_controllerConnected;
+  #if defined(DEBUG)
+  output += F("\n  Drive enable:  ");
+  if ( driveEnabled ) {
+    output += F("true");
+  } else {
+    output += F("false");
+  }
+  output += F("\n  Drive stopped: ");
+  if ( driveStopped ) {
+    output += F("true");
+  } else {
+    output += F("false");
+  }
+  output += F("\n  Speed profile: ");
+  switch (speedProfile) {
+    case WALK:   { output += F("Walk");   break; }
+    case JOG:    { output += F("Jog");    break; }
+    case RUN:    { output += F("Run");    break; }
+    case SPRINT: { output += F("Sprint"); break; }
+    default:     { output += F("Unknown"); }
+  };
+  #endif
 }
 
 // ============================
-//      duringDisconnect()
+//      connectionStatus()
 // ============================
-bool Controller_Wrapper::duringDisconnect(void)
+byte Controller::connectionStatus(void)
+{
+  return m_connectionStatus;
+}
+
+// ===========================
+//      isDisconnecting()
+// ===========================
+bool Controller::isDisconnecting(void)
 {
   return (m_disconnectCount > 0 ? true : false);
 }
 
-// =================================
-//      continueDisconnecting()
-// =================================
-void Controller_Wrapper::continueDisconnecting(void)
+// =========================
+//      disconnecting()
+// =========================
+void Controller::disconnecting(void)
 {
   // ----------------------------------------------------------------------------------
   // In loop(), each peripheral is given an opportunity to act on the disconnect event.
@@ -90,17 +117,23 @@ void Controller_Wrapper::continueDisconnecting(void)
   // all have done so.
   // ----------------------------------------------------------------------------------
 
-  if ( m_disconnectCount > NUMBER_OF_PERIPHERALS ) {
+  if ( m_disconnectCount > pSettings[iPeripheralCount] ) {
     m_disconnectCount = 0;
     return;
   }
   m_disconnectCount++;
 }
 
+int Controller::getType(void)
+{
+  return pSettings[iCntrlType];
+}
+
+
 // ========================
 //      m_authorized()
 // ========================
-bool Controller_Wrapper::m_authorized(void)
+bool Controller::m_authorized(void)
 {
   bool authorized = false;
 
@@ -112,7 +145,7 @@ bool Controller_Wrapper::m_authorized(void)
   }
   btAddress.toUpperCase();
 
-  #ifdef DEBUG
+  #if defined(DEBUG)
   output = F("\n");
   output += m_className+F("m_authorized()");
   output += F(" - ");
@@ -121,7 +154,7 @@ bool Controller_Wrapper::m_authorized(void)
   printOutput();
   #endif
 
-  for (byte i = 0; i < NUMBER_OF_MAC_ADDRESSES; i++) {
+  for (byte i = 0; i < sizeof(authorizedMACAddresses); i++) {
     if (btAddress == getPgmString(authorizedMACAddresses[i])) {
       authorized = true;
       break;
@@ -132,7 +165,7 @@ bool Controller_Wrapper::m_authorized(void)
   // Debugging.
   // ----------
 
-  #ifdef DEBUG
+  #if defined(DEBUG)
   output = m_className+F("m_authorized()");
   output += F(" - ");
   output += F("Controller");
@@ -150,24 +183,24 @@ bool Controller_Wrapper::m_authorized(void)
 // =================================
 //      m_setConnectionStatus()
 // =================================
-void Controller_Wrapper::m_setConnectionStatus(byte status)
+void Controller::m_setConnectionStatus(byte status)
 {
   // -----------------------------------------------------------------------
   // Input: NONE (0), HALF (1) or FULL (2)
-  // When we lose the controller, start the continueDisconnecting counter.
+  // When we lose the controller, start the disconnecting counter.
   // In loop(), each peripheral will be given a chance to act on this event.
   // -----------------------------------------------------------------------
   
-  if ( m_controllerConnected != NONE && status == NONE ) {
+  if ( m_connectionStatus != NONE && status == NONE ) {
     m_disconnectCount = 1;
   }
-  m_controllerConnected = status;  
+  m_connectionStatus = status;  
 }
 
 // ===============================
 //      m_initCriticalFault()
 // ===============================
-void Controller_Wrapper::m_initCriticalFault(byte idx)
+void Controller::m_initCriticalFault(byte idx)
 {
   m_faultData[idx].badData          = 0;
   m_faultData[idx].lastMsgTime      = millis();
@@ -178,7 +211,7 @@ void Controller_Wrapper::m_initCriticalFault(byte idx)
   // Debugging.
   // ----------
 
-  #ifdef DEBUG
+  #if defined(DEBUG)
   output = m_className+F("m_initCriticalFault()");
   output += F(" - ");
   output += F("Critical fault data");
@@ -190,7 +223,7 @@ void Controller_Wrapper::m_initCriticalFault(byte idx)
 // ================================
 //      m_resetCriticalFault()
 // ================================
-void Controller_Wrapper::m_resetCriticalFault(byte idx)
+void Controller::m_resetCriticalFault(byte idx)
 {
   m_faultData[idx].badData = 0;
   m_faultData[idx].reconnect = true;
@@ -205,7 +238,7 @@ void Controller_Wrapper::m_resetCriticalFault(byte idx)
   // Debugging.
   // ----------
 
-  #ifdef DEBUG
+  #if defined(DEBUG)
   output = m_className+F("m_resetCriticalFault()");
   output += F(" - ");
   output += F("Critical fault data");
@@ -217,7 +250,7 @@ void Controller_Wrapper::m_resetCriticalFault(byte idx)
 // =================================
 //      m_detectCriticalFault()
 // =================================
-bool Controller_Wrapper::m_detectCriticalFault(void)
+bool Controller::m_detectCriticalFault(void)
 {
   unsigned long currentTime;
   unsigned long lastMsgTime;
@@ -234,7 +267,7 @@ bool Controller_Wrapper::m_detectCriticalFault(void)
     // -----------------------
 
     if (m_faultData[0].reconnect ) {
-      if (lagTime < LAG_TIME_TO_RECONNECT ) {
+      if (lagTime < pSettings[iLagReconnect] ) {
        m_faultData[0].reconnect = false;
       }
       lastMsgTime = currentTime;
@@ -254,9 +287,9 @@ bool Controller_Wrapper::m_detectCriticalFault(void)
     // Disconnect after too much lag.
     // ------------------------------
 
-    if ( lagTime > LAG_TIME_TO_DISCONNECT ) {
+    if ( lagTime > pSettings[iLagDisconnect] ) {
 
-      #ifdef DEBUG
+      #if defined(DEBUG)
       output = m_className+F("m_detectCriticalFault()");
       output += F(" - ");
       output += F("Disconnecting due to lag time.");  output += F("\n");
@@ -272,9 +305,9 @@ bool Controller_Wrapper::m_detectCriticalFault(void)
     // Stop the drive motors after too much lag.
     // -----------------------------------------
 
-    if ( lagTime > LAG_TIME_TO_KILL_MOTORS && driveStopped == false ) {
+    if ( lagTime > pSettings[iLagKillMotor] && driveStopped == false ) {
 
-      #ifdef DEBUG
+      #if defined(DEBUG)
       output = m_className+F("m_detectCriticalFault()");
       output += F(" - ");
       output += F("Stopping drive motors due to lag.");
@@ -300,7 +333,7 @@ bool Controller_Wrapper::m_detectCriticalFault(void)
         // Has the desired amount of time between failed checks passed?
         // ------------------------------------------------------------
 
-        unsigned long interval = ( connected() ? PLUGGED_STATE_LONG_INTERVAL : PLUGGED_STATE_SHORT_INTERVAL);
+        unsigned long interval = ( connected() ? pSettings[iLongInterval] : pSettings[iShortInterval]);
         if ( currentTime > ( m_faultData[0].pluggedStateTime + interval )) {
 
           // -------------------------------------------------------
@@ -311,7 +344,7 @@ bool Controller_Wrapper::m_detectCriticalFault(void)
          m_faultData[0].badData++;
          m_faultData[0].pluggedStateTime = 0;
 
-          #ifdef DEBUG
+          #if defined(DEBUG)
           output = m_className+F("m_detectCriticalFault()");
           output += F(" - ");
           output += F("Invalid data from primary controller.");
@@ -346,7 +379,7 @@ bool Controller_Wrapper::m_detectCriticalFault(void)
       // Disconnect. We have too much bad data coming from the controller.
       // -----------------------------------------------------------------
 
-      #ifdef DEBUG
+      #if defined(DEBUG)
       output = m_className+F("m_detectCriticalFault()");
       output += F(" - ");
       output += F("Disconnecting due to excessive bad data.");
@@ -359,11 +392,10 @@ bool Controller_Wrapper::m_detectCriticalFault(void)
   return false;
 }
 
-
 // =============================
 //      getButtonsPressed()
 // =============================
-int Controller_Wrapper::getButtonsPressed(void)
+int Controller::getButtonsPressed(void)
 {
   int baseButton = -1;
 
@@ -387,242 +419,366 @@ int Controller_Wrapper::getButtonsPressed(void)
   // ----------------------------
 
   return ( baseButton + m_getModifierButtons() );
+}
+/* ================================================================================
+ *                                   Button Class
+ * ================================================================================ */
 
+// =====================
+//      Constructor
+// =====================
+Button::Button(Controller* pController)
+{
+  m_controller = pController;
+
+  #if defined(DEBUG)
+  m_className = "Button::";
+  #endif
 }
 
+// ====================
+//      Destructor
+// ====================
+Button::~Button(void) {}
 
-#ifdef TEST_CONTROLLER
+// ===================
+//      clicked()
+// ===================
+byte Button::clicked(int buttonEnum)
+{
+  m_controller->getButtonClick(buttonEnum);
+}
+
+// ===================
+//      pressed()
+// ===================
+byte Button::pressed(int buttonEnum)
+{
+  m_controller->getButtonPress(buttonEnum);
+}
+
+// =======================
+//      analogValue()
+// =======================
+byte Button::analogValue(int buttonEnum)
+{
+  m_controller->getAnalogButton(buttonEnum);
+}
+
 /* ================================================================================
- *                                 Testing Functions
+ *                                  Joystick Class
+ * ================================================================================ */
+
+// =====================
+//      Constructor
+// =====================
+Joystick::Joystick(const byte argSide, const int argDeadZone, Controller* pController)
+{
+  m_controller = pController;
+  side = argSide;
+  deadZone = argDeadZone;
+}
+
+// ====================
+//      Destructor
+// ====================
+Joystick::~Joystick(void) {}
+
+// =======================
+//      displayInit()
+// =======================
+void Joystick::displayInit(void)
+{
+  #if defined(DEBUG)
+  output += m_side();
+  output += F("\n    Dead zone:   ");
+  output += deadZone;
+  #endif
+}
+
+// ==================
+//      m_getX()
+// ==================
+byte Joystick::m_getX(void)
+{
+  if ( side == 0 ) {
+    return m_controller->getAnalogHat(LeftHatX);
+  } else if ( side == 1 ) {
+    return m_controller->getAnalogHat(RightHatX);
+  } else {
+    return center;
+  }
+}
+
+// ==================
+//      m_getY()
+// ==================
+byte Joystick::m_getY(void)
+{
+  if ( side == 0 ) {
+    return m_controller->getAnalogHat(LeftHatY);
+  } else if ( side == 1 ) {
+    return m_controller->getAnalogHat(RightHatY);
+  } else {
+    return center;
+  }
+}
+
+// ==================
+//      m_side()
+// ==================
+String Joystick::m_side(void)
+{
+  if ( side == 0 ) {
+    return "Left";
+  } else {
+    return "Right";
+  }
+}
+
+/* ================================================================================
+ *                               Joystick_Drive Class
+ * ================================================================================ */
+
+// =====================
+//      Constructor
+// =====================
+Joystick_Drive::Joystick_Drive(byte side, int deadZone, Controller* pController) : Joystick(side, deadZone, pController) {}
+
+// ====================
+//      Destructor
+// ====================
+Joystick_Drive::~Joystick_Drive(void) {}
+
+// ====================
+//      steering()
+// ====================
+int Joystick_Drive::steering(void)
+{
+  return m_getX();
+}
+
+// ====================
+//      throttle()
+// ====================
+int Joystick_Drive::throttle(void)
+{
+  return m_getY();
+}
+
+/* ================================================================================
+ *                                Joystick_Dome Class
+ * ================================================================================ */
+
+// =====================
+//      Constructor
+// =====================
+Joystick_Dome::Joystick_Dome(byte side, int deadZone, Controller* pController) : Joystick(side, deadZone, pController) {}
+
+// ====================
+//      Destructor
+// ====================
+Joystick_Dome::~Joystick_Dome(void) {}
+
+// ====================
+//      rotation()
+// ====================
+byte Joystick_Dome::rotation(void)
+{
+  return m_getX();
+}
+
+#if defined(TEST_CONTROLLER)
+/* ================================================================================
+ *                            Test Controller Functions
  * ================================================================================ */
 
 // ==========================
 //      m_displayInput()
 // ==========================
-void Controller_Wrapper::m_displayInput()
+void Controller::m_displayInput(void)
 {
   output = "";
-  bool hasBase = false;
-  bool hasStick = false;
-  String btnLabel = "";
 
-  if ( getButtonPress(L1) )  { output = m_appendString(output, "L1"); }
-  if ( getButtonPress(R1) )  { output = m_appendString(output, "R1"); }
-  if ( getButtonPress(L2) )  { output = m_appendString(output, "L2"); }
-  if ( getButtonPress(R2) )  { output = m_appendString(output, "R2"); }
-  if ( getButtonPress(PS) )  { output = m_appendString(output, "PS"); }
-  if ( getButtonPress(PS2) ) { output = m_appendString(output, "PS2"); }
-
-  if ( getButtonClick(4) ) {
-    #if defined(PS5_CONTROLLER)
-    btnLabel = "CREATE";
-    #elif defined(PS4_CONTROLLER)
-    btnLabel = "SHARE";
-    #elif defined(PS3_CONTROLLER)
-    btnLabel = "SELECT";
-    #elif defined(PS3_NAVIGATION)
-    btnLabel = "CROSS";
-    #endif
-    if ( getButtonPress(PS) || getButtonPress(PS2) || (getAnalogButton(L2) > 10) || (getAnalogButton(R2) > 10) ) {
-      hasBase = true;
+  if ( connectionStatus() != NONE ) {
+    if ( button.hasBasePressed() ) {
+      button.display(&output);
     }
-    output = m_appendString(output, btnLabel);
-  }
-  if ( getButtonClick(5) ) {
-    #if defined(PS4_CONTROLLER) || defined(PS5_CONTROLLER)
-    btnLabel = "OPTIONS";
-    #elif defined(PS3_CONTROLLER)
-    btnLabel = "START";
-    #elif defined(PS3_NAVIGATION)
-    btnLabel = "CIRCLE";
-    #endif
-    if ( getButtonPress(PS) || getButtonPress(PS2) || (getAnalogButton(L2) > 10) || (getAnalogButton(R2) > 10) ) {
-      hasBase = true;
+    if ( (driveStick.side == 0 && ! button.pressed(L1)) ||
+         (driveStick.side == 1 && ! button.pressed(R1)) ) {
+      driveStick.display(&output);
     }
-    output = m_appendString(output, btnLabel);
-  }
-
-  if ( getButtonClick(L3) ) {
-    hasBase = true;
-    output = m_appendString(output, "L3");
-  }
-  if ( getButtonClick(R3) ) {
-    hasBase = true;
-    output = m_appendString(output, "R3");
-  }
-  if ( getButtonClick(UP) ) {
-    hasBase = true;
-    output = m_appendString(output, "UP");
-  }
-  if ( getButtonClick(RIGHT) ) {
-    hasBase = true;
-    output = m_appendString(output, "RIGHT");
-  }
-  if ( getButtonClick(DOWN) ) {
-    hasBase = true;
-    output = m_appendString(output, "DOWN");
-  }
-  if ( getButtonClick(LEFT) ) {
-    hasBase = true;
-    output = m_appendString(output, "LEFT");
-  }
-
-  if ( getButtonClick(TRIANGLE) ){
-    #if defined(PS_NAVIGATION)
-    btnLabel = "UP(Nav2)";
-    #else
-    btnLabel = "TRIANGLE";
-    #endif
-    hasBase = true;
-    output = m_appendString(output, btnLabel);
-  }
-  if ( getButtonClick(CIRCLE) ){
-    #if defined(PS_NAVIGATION)
-    btnLabel = "RIGHT(Nav2)";
-    #else
-    btnLabel = "CIRCLE";
-    #endif
-    hasBase = true;
-    output = m_appendString(output, btnLabel);
-  }
-  if ( getButtonClick(CROSS) ) {
-    #if defined(PS_NAVIGATION)
-    btnLabel = "DOWN(Nav2)";
-    #else
-    btnLabel = "CROSS";
-    #endif
-    hasBase = true;
-    output = m_appendString(output, btnLabel);
-  }
-  if ( getButtonClick(SQUARE) ) {
-    #if defined(PS_NAVIGATION)
-    btnLabel = "LEFT(Nav2)";
-    #else
-    btnLabel = "SQUARE";
-    #endif
-    hasBase = true;
-    output = m_appendString(output, btnLabel);
-  }
-
-  // ------------------
-  // Display the stick.
-  // ------------------
-
-  int posX = getAnalogHat(LeftHatX);
-  int posY = getAnalogHat(LeftHatY);
-
-  if ( (abs(posX - JOYSTICK_CENTER) >= JOYSTICK_DEAD_ZONE) || 
-       (abs(posY - JOYSTICK_CENTER) >= JOYSTICK_DEAD_ZONE) ) {
-    if ( ! getButtonPress(L1) ) {
-      hasStick = true;
-      m_displayStick("Left", posX, posY);
-    }
-  }
-
-  if ( connectionStatus() == FULL ) {
-
-    posX = getAnalogHat(RightHatX);
-    posY = getAnalogHat(RightHatY);
-
-    if ( (abs(posX - JOYSTICK_CENTER) >= JOYSTICK_DEAD_ZONE) || 
-         (abs(posY - JOYSTICK_CENTER) >= JOYSTICK_DEAD_ZONE) ) {
-      if ( ! getButtonPress(R1) ) {
-        hasStick = true;
-        m_displayStick("Right", posX, posY);
+    if ( connectionStatus() == FULL ) {
+      if ( (domeStick.side == 0 && ! button.pressed(L1)) ||
+           (domeStick.side == 1 && ! button.pressed(R1)) ) {
+        domeStick.display(&output);
       }
     }
   }
 
-  if ( hasBase || hasStick ) {
-    printOutput();
+  printOutput();
+}
+
+// ==========================
+//      hasBasePressed()
+// ==========================
+bool Button::hasBasePressed(void)
+{
+  bool out = false;  
+  int list[12] = { L4, R4, L3, R3, UP, RIGHT, DOWN, LEFT, TRIANGLE, CIRCLE, CROSS, SQUARE };
+
+  for (int i = 0; i < 12; i++) {
+    if ( pressed(list[i]) ) {
+      if ( i < 2 ) {
+        // CREATE|SHARE|SELECT|OPTIONS|START|CROSS(PS3Nav)|CIRCLE(PS3Nav).
+        // These are base buttons when combined with PS|PS2 or L2|R2.
+        if ( pressed(PS) || pressed(PS2) || pressed(L2) || pressed(R2) ) {
+          out = true;
+        }
+      } else {
+        // All others are always base buttons.
+        out = true;
+      }
+    }
+  }
+
+  return out;
+}
+
+// ===================
+//      display()
+// ===================
+void Button::display(String* out)
+{
+  int list[18] = { L1, R1, L2, R2, PS, PS2, L4, R4, L3, R3, UP, RIGHT, DOWN, LEFT, TRIANGLE, CIRCLE, CROSS, SQUARE };
+  for (int i = 0; i < 18; i++) {
+    if ( pressed(list[i]) ) {
+      m_appendString(out, (String)label(list[i]));
+    }
   }
 }
 
 // ==========================
 //      m_appendString()
 // ==========================
-String Controller_Wrapper::m_appendString(String inString, String addString)
+void Button::m_appendString(String* pValue, const String addString)
 {
-  if ( inString != "" ) { inString += F("+"); }
-  inString += addString;
-  return inString;
+  if ( pValue->length() > 0 ) {
+    pValue->concat("+");
+  }
+  pValue->concat(addString);
+}
+
+// =================
+//      label()
+// =================
+String Button::label(int buttonEnum)
+{
+  switch (buttonEnum) {
+    case UP:       { return "UP"; }
+    case RIGHT:    { return "RIGHT"; }
+    case DOWN:     { return "DOWN"; }
+    case LEFT:     { return "LEFT"; }
+    case L3:       { return "L3"; }
+    case R3:       { return "R3"; }
+    case L2:       { return "L2"; }
+    case R2:       { return "R2"; }
+    case L1:       { return "L1"; }
+    case R1:       { return "R1"; }
+    case TRIANGLE: { return "TRIANGLE"; }
+    case CIRCLE:   { return "CIRCLE"; }
+    case CROSS:    { return "CROSS"; }
+    case SQUARE:   { return "SQUARE"; }
+    case PS:       { return "PS"; }
+    case PS2:      { return "PS2"; }
+    case 4: {
+      switch (m_controller->pSettings[iCntrlType]) {
+        case 0: { return "CROSS";  break; }
+        case 1: { return "SELECT"; break; }
+        case 2: { return "SHARE";  break; }
+        case 3: { return "CREATE"; break; }
+        default: { return "UNKNOWN"; }
+      }
+    }
+    case 5: {
+      switch (m_controller->pSettings[iCntrlType]) {
+        case 0: { return "CIRCLE";  break; }
+        case 1: { return "START";   break; }
+        case 2: { return "OPTIONS"; break; }
+        case 3: { return "OPTIONS"; break; }
+        default: { return "UNKNOWN"; }
+      }
+    }
+    default: { return "UNKNOWN"; }
+  }
+}
+
+// ========================
+//      abbreviation()
+// ========================
+String Button::abbreviation(int buttonEnum)
+{
+  switch (buttonEnum) {
+    case UP:       { return "Up"; }
+    case RIGHT:    { return "Rt"; }
+    case DOWN:     { return "Dn"; }
+    case LEFT:     { return "Lt"; }
+    case L3:       { return "L3"; }
+    case R3:       { return "R3"; }
+    case L2:       { return "L2"; }
+    case R2:       { return "R2"; }
+    case L1:       { return "L1"; }
+    case R1:       { return "R1"; }
+    case TRIANGLE: { return "Tri"; }
+    case CIRCLE:   { return "Cir"; }
+    case CROSS:    { return "Cro"; }
+    case SQUARE:   { return "Sq"; }
+    case PS:       { return "PS"; }
+    case PS2:      { return "PS2"; }
+    case 4: {
+      switch (m_controller->pSettings[iCntrlType]) {
+        case 0: { return "X";  break; }
+        case 1: { return "Sl"; break; }
+        case 2: { return "Sh"; break; }
+        case 3: { return "Cr"; break; }
+        default: { return "Unk"; }
+      }
+    }
+    case 5: {
+      switch (m_controller->pSettings[iCntrlType]) {
+        case 0: { return "O";   break; }
+        case 1: { return "St";  break; }
+        case 2: { return "Opt"; break; }
+        case 3: { return "Opt"; break; }
+        default: { return "Unk"; }
+      }
+    }
+  }
+}
+
+// ===================
+//      display()
+// ===================
+void Joystick::display(String* out)
+{
+  if ( (abs(m_getX() - center) >= deadZone) ||
+       (abs(m_getY() - center) >= deadZone) ) {
+    m_appendString(out);
+  }
 }
 
 // ==========================
-//      m_displayStick()
+//      m_appendString()
 // ==========================
-void Controller_Wrapper::m_displayStick(String s, byte x, byte y)
+void Joystick::m_appendString(String* pValue)
 {
-  if ( output != "" ) {
-    output += " + ";
+  if ( pValue->length() > 0 ) {
+    pValue->concat(F("+"));
   }
-  output += s;
-  output += F(": ");
-  output += x;
-  output += F(",");
-  output += y;
-}
-
-// =========================
-//      m_scrollInput()
-// =========================
-void Controller_Wrapper::m_scrollInput()
-{
-  if ( ! connected() ) {
-    return;
-  }
-
-  /* 
-   * PS5 Controller = LX:x LY:x Up:x Rt:x Dn:x Lt:x L3:x L2:x L1:x PS:x Cr:x Op:x RX:x RY:x Tr:x Ci:x Cr:x Sq:x R3:x R2:x R1:x
-   * PS4 Controller = LX:x LY:x Up:x Rt:x Dn:x Lt:x L3:x L2:x L1:x PS:x Sh:x Op:x RX:x RY:x Tr:x Ci:x Cr:x Sq:x R3:x R2:x R1:x
-   * PS3 Controller = LX:x LY:x Up:x Rt:x Dn:x Lt:x L3:x L2:x L1:x PS:x Sl:x St:x RX:x RY:x Tr:x Ci:x Cr:x Sq:x R3:x R2:x R1:x
-   * PS3 Navigation = LX:x LY:x Up:x Rt:x Dn:x Lt:x L3:x L2:x L1:x PS:x X:x O:x [RX:x RY:x Up2:x Rt2:x Dn2:x Lt2:x R3:x R2:x R1:x PS2:x]
-   */
-
-  output = F("LX:");    output += getAnalogHat(LeftHatX);
-  output += F(" LY:");  output += getAnalogHat(LeftHatX);
-  output += F(" Up:");  output += getButtonClick(UP);
-  output += F(" Rt:");  output += getButtonClick(RIGHT);
-  output += F(" Dn:");  output += getButtonClick(DOWN);
-  output += F(" Lt:");  output += getButtonClick(LEFT);
-  output += F(" L1:");  output += getButtonPress(L1);
-  output += F(" L2:");  output += getAnalogButton(L2);
-  output += F(" L3:");  output += getButtonClick(L3);
-  output += F(" PS:");  output += getButtonPress(PS);
-
-  #if defined(PS5_CONTROLLER)
-  output += F(" Cr:");  output += getButtonPress(4);
-  output += F(" Op:");  output += getButtonPress(5);
-  #elif defined(PS4_CONTROLLER)
-  output += F(" Sh:");  output += getButtonPress(4);
-  output += F(" Op:");  output += getButtonPress(5);
-  #elif defined(PS3_CONTROLLER)
-  output += F(" Sl:");  output += getButtonPress(4);
-  output += F(" St:");  output += getButtonPress(5);
-  #elif defined(PS3_NAVIGATION)
-  output += F(" X:");   output += getButtonPress(4);
-  output += F(" O:");   output += getButtonPress(5);
-  #endif
-
-  if ( connectionStatus() == FULL ) {
-    output += F(" RX:");  output += getAnalogHat(RightHatX);
-    output += F(" RY:");  output += getAnalogHat(RightHatX);
-    #if defined(PS3_NAVIGATION)
-    output += F(" Up2:");  output += getButtonClick(TRIANGLE);
-    output += F(" Rt2:");  output += getButtonClick(CIRCLE);
-    output += F(" Dn2:");  output += getButtonClick(CROSS);
-    output += F(" Lf2:");  output += getButtonClick(SQUARE);
-    #else
-    output += F(" Tr:");  output += getButtonClick(TRIANGLE);
-    output += F(" Cr:");  output += getButtonClick(CIRCLE);
-    output += F(" Ci:");  output += getButtonClick(CROSS);
-    output += F(" Sq:");  output += getButtonClick(SQUARE);
-    #endif
-    output += F(" R1:");  output += getButtonPress(R1);
-    output += F(" R2:");  output += getAnalogButton(R2);
-    output += F(" R3:");  output += getButtonClick(R3);
-  }
-
-  printOutput();
+  pValue->concat(m_side());
+  pValue->concat(F(": "));
+  pValue->concat(m_getX());
+  pValue->concat(F(","));
+  pValue->concat(m_getY());
 }
 #endif

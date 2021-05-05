@@ -2,7 +2,7 @@
  *    B.L.A.C.Box: Brian Lubkeman's Astromech Controller
  * =================================================================================
  * DomeMotor.cpp - Library for supported dome motor controllers
- * Created by Brian Lubkeman, 23 March 2021
+ * Created by Brian Lubkeman, 4 May 2021
  * Inspired by S.H.A.D.O.W. controller code written by KnightShade
  * Released into the public domain.
  */
@@ -16,15 +16,22 @@
 // =====================
 //      Constructor
 // =====================
-DomeMotor::DomeMotor(void)
+DomeMotor::DomeMotor(Controller* pController, const byte settings[], const unsigned long timings[])
 {
-  m_rotationStatus = STOPPED;
-  m_previousTime   = 0;
+  m_controller = pController;
+  m_settings = settings;
+  m_timings  = timings;
 
-  m_turnDirection  = 1;  // 1 = positive turn, -1 negative turn
+  m_joystick = &m_controller->domeStick;
+  m_button = &m_controller->button;
+
+  m_rotationStatus = STOPPED;
+  m_turnDirection  = m_settings[iInvertTurn];
+
   m_targetPosition = 0;  // (0 - 359) - degrees in a circle, 0 = home
   m_stopTurnTime   = 0;
   m_startTurnTime  = 0;
+  m_previousTime   = 0;
 
   m_automationRunning = false;
   m_automationSettingsInvalid = false;
@@ -33,7 +40,7 @@ DomeMotor::DomeMotor(void)
   // Debugging.
   // ----------
 
-  #ifdef DEBUG
+  #if defined(DEBUG)
   m_className = F("DomeMotor::");
   #endif
 }
@@ -46,7 +53,7 @@ DomeMotor::~DomeMotor() {}
 // =================
 //      begin()
 // =================
-void DomeMotor::begin()
+void DomeMotor::begin(void)
 {
   // ---------------------------------------------------
   // Prepare the random number seed for dome automation.
@@ -58,25 +65,25 @@ void DomeMotor::begin()
   // Validate dome automation settings.
   // ----------------------------------
 
-  if ( TIME_360_DOME_TURN < TIME_360_DOME_TURN_MIN ||
-       TIME_360_DOME_TURN > TIME_360_DOME_TURN_MAX ||
-       DOME_AUTO_SPEED < DOME_AUTO_SPEED_MIN ||
-       DOME_AUTO_SPEED > DOME_AUTO_SPEED_MAX ) {
+  if ( m_timings[iTurn360] < m_timings[iTurn360Min] ||
+       m_timings[iTurn360] > m_timings[iTurn360Max] ||
+       m_settings[iAutoSpeed] < m_settings[iAutoSpeedMin] ||
+       m_settings[iAutoSpeed] > m_settings[iAutoSpeedMax] ) {
 
     m_automationSettingsInvalid = true;
 
-    #ifdef DEBUG
+    #if defined(DEBUG)
     output = m_className+F("begin()");
     output += F(" - ");
     output += F("Invalid settings.");
     output += F("\n");
-    output += F("  Turn time: ");  output += TIME_360_DOME_TURN;
-    output += F("\t Min: ");       output += TIME_360_DOME_TURN_MIN;
-    output += F("\t Max: ");       output += TIME_360_DOME_TURN_MAX;
+    output += F("  Turn time: ");  output += m_timings[iTurn360];
+    output += F("\t Min: ");       output += m_timings[iTurn360Min];
+    output += F("\t Max: ");       output += m_timings[iTurn360Max];
     output += F("\n");
-    output += F("  Dome speed: "); output += DOME_AUTO_SPEED;
-    output += F("\t Min: ");       output += DOME_AUTO_SPEED_MIN;
-    output += F("\t Max: ");       output += DOME_AUTO_SPEED_MAX;
+    output += F("  Dome speed: "); output += m_settings[iAutoSpeed];
+    output += F("\t Min: ");       output += m_settings[iAutoSpeedMin];
+    output += F("\t Max: ");       output += m_settings[iAutoSpeedMax];
     printOutput();
     #endif
   }
@@ -90,9 +97,9 @@ void DomeMotor::interpretController(void)
 /* ===============================================
  *
  *                            PS3 Navigation    PS3|PS4|PS5 Controller
- *                            ==============    ======================
- *  Enable dome automation    L2+Circle         L2+Select|Share|Create
- *  Disable dome automation   L2+Cross          L2+Start|Options
+ *                            ==============    ===========================
+ *  Enable dome automation    L2|R2 + Circle    L2|R2 + Select|Share|Create
+ *  Disable dome automation   L2|R2 + Cross     L2|R2 + Start|Options
  *
  *                            Dual PS3 Navs     Single PS3 Nav
  *                            ===============   ==================
@@ -105,7 +112,7 @@ void DomeMotor::interpretController(void)
   // -------------------------------------------
 
   if ( m_controller->connectionStatus() == NONE ) {
-    #ifdef DEBUG
+    #if defined(DEBUG)
     output = m_className+F("interpretController()");
     output += F(" - ");
     output += F("No controller");
@@ -114,33 +121,16 @@ void DomeMotor::interpretController(void)
     return;
   }
 
+
   // ----------------------------------------
   // Look for dome automation enable/disable.
   // ----------------------------------------
 
-  if ( m_controller->getButtonPress(L2) ) {
-
-    if ( isAutomationRunning() ) {
-
-      #if defined(PS5_CONTROLLER)
-      if ( m_controller->getButtonClick(CREATE) ) {
-      #elif defined(PS4_CONTROLLER)
-      if ( m_controller->getButtonClick(SHARE) ) {
-      #else
-      if ( m_controller->getButtonClick(SELECT) ) {
-      #endif
-        m_automationOff();
-      }
-
-    } else {
-
-      #if defined(PS4_CONTROLLER) || defined(PS5_CONTROLLER)
-      if ( m_controller->getButtonClick(OPTIONS) ) { 
-      #else
-      if ( m_controller->getButtonClick(START) ) { 
-      #endif
-        m_automationOn();
-      }
+  if ( m_button->pressed(L2) || m_button->pressed(R2) ) {
+    if ( m_button->pressed(L4) && isAutomationRunning() ) {
+      m_automationOff();
+    } else if ( m_button->pressed(R4) && ! isAutomationRunning() ) {
+      m_automationOn();
     }
   }
 
@@ -149,7 +139,7 @@ void DomeMotor::interpretController(void)
   // ------------------------------------------------------------------------
 
   unsigned long currentTime = millis();
-  if ( (currentTime - m_previousTime) < (SERIAL_LATENCY * 2) ) {
+  if ( (currentTime - m_previousTime) < (m_settings[iDomeLatency] * 2) ) {
     return;
   }
   m_previousTime = currentTime;
@@ -162,49 +152,27 @@ void DomeMotor::interpretController(void)
   // Get the joystick position.
   // --------------------------
 
-  byte stickPosition = JOYSTICK_CENTER;
+  byte stickPosition = m_joystick->center;
 
-  #if defined(PS3_NAVIGATION)
-
-  if ( m_controller->connectionStatus() == HALF ) {
-    if ( ! m_controller->getButtonPress(L2) ) {
-      return;
-    }
-    stickPosition = m_controller->getAnalogHat(LeftHatX);
+  if ( m_controller->getType() != 0 ) {
+    // The controller is a PS3, PS4, or PS5 controller.
+    stickPosition = m_joystick->rotation();
   } else if ( m_controller->connectionStatus() == FULL ) {
-    stickPosition = m_controller->getAnalogHat(RightHatX);
+    // The controller is a pair of PS3 Move Navigations.
+    stickPosition = m_joystick->rotation();
+  } else if ( m_button->pressed(L2) ) {
+    // The controller is a single PS3 Move Navigation.
+    stickPosition = m_joystick->rotation();
   } else {
     return;
   }
-  
-  #else
-
-  /* ===============================================
-   * 
-   *          PS3,PS4,PS5      PS3,PS4,PS5
-   *          -----------  or  ------------------
-   * Drive    Left stick       Right stick
-   * Dome     Right stick      Left stick
-   *
-   * This is configurable in the Settings.h tab.
-   * 
-   * =============================================== */
-
-  if ( DRIVE_STICK == 0 ) {
-    stickPosition = m_controller->getAnalogHat(RightHatX);
-  } else if ( DRIVE_STICK == 1 ) {
-    stickPosition = m_controller->getAnalogHat(LeftHatX);  
-  } else {
-    return;
-  }
-  #endif
 
   // -----------------------------------------------------
   // A stick within its dead zone is the same as centered.
   // Stop dome rotation when the stick is centered.
   // -----------------------------------------------------
   
-  if ( abs(stickPosition - JOYSTICK_CENTER) < JOYSTICK_DEAD_ZONE ) {
+  if ( abs(stickPosition - m_joystick->center) < m_joystick->deadZone ) {
     stop();
     return;
   }
@@ -213,7 +181,7 @@ void DomeMotor::interpretController(void)
   // Convert the joystick position to a rotation speed.
   // --------------------------------------------------
 
-  int rotationSpeed = map(stickPosition, JOYSTICK_MIN, JOYSTICK_MAX, -DOME_SPEED, DOME_SPEED);
+  int rotationSpeed = map(stickPosition, m_joystick->minValue, m_joystick->maxValue, -m_settings[iDomeSpeed], m_settings[iDomeSpeed]);
 
   // -------------------------------------------
   // Turn off dome automation if manually moved.
@@ -255,7 +223,7 @@ void DomeMotor::m_automationOn(void)
   // Debugging.
   // ----------
 
-  #ifdef DEBUG
+  #if defined(DEBUG)
   output = m_className+F("automationOn()");
   output += F(" - ");
   output += F("Dome automation");
@@ -277,7 +245,7 @@ void DomeMotor::m_automationOff(void)
   // Debugging.
   // ----------
 
-  #ifdef DEBUG
+  #if defined(DEBUG)
   output = m_className+F("automationOff()");
   output += F(" - ");
   output += F("Dome automation");
@@ -332,10 +300,10 @@ void DomeMotor::m_automationInit(void)
     m_startTurnTime = currentTime + (random(3, 11) * 1000); // Wait 3-10 seconds before turning.
     m_targetPosition = random(5,354);
     if ( m_targetPosition < 180 ) {
-      m_stopTurnTime = m_startTurnTime + ((int)m_targetPosition / (float)360.0 * (unsigned long)TIME_360_DOME_TURN);
+      m_stopTurnTime = m_startTurnTime + ((int)m_targetPosition / (float)360.0 * (unsigned long)m_timings[iTurn360]);
       m_turnDirection = 1;
     } else {
-      m_stopTurnTime = m_startTurnTime + (((float)360.0 - (int)m_targetPosition) / (float)360.0 * (unsigned long)TIME_360_DOME_TURN);
+      m_stopTurnTime = m_startTurnTime + (((float)360.0 - (int)m_targetPosition) / (float)360.0 * (unsigned long)m_timings[iTurn360]);
       m_turnDirection = -1;
     }
 
@@ -347,9 +315,9 @@ void DomeMotor::m_automationInit(void)
 
     m_startTurnTime = currentTime + (random(1,6) * 1000); // Wait 1-5 seconds before returning home.
     if ( m_targetPosition < 180 ) {
-      m_stopTurnTime = m_startTurnTime + ((int)m_targetPosition / (float)360.0 * (unsigned long)TIME_360_DOME_TURN);
+      m_stopTurnTime = m_startTurnTime + ((int)m_targetPosition / (float)360.0 * (unsigned long)m_timings[iTurn360]);
     } else {
-      m_stopTurnTime = m_startTurnTime + (((float)360 - (int)m_targetPosition) / (float)360.0 * (unsigned long)TIME_360_DOME_TURN);
+      m_stopTurnTime = m_startTurnTime + (((float)360 - (int)m_targetPosition) / (float)360.0 * (unsigned long)m_timings[iTurn360]);
     }
     m_turnDirection *= -1;
     m_targetPosition = 0;
@@ -365,7 +333,7 @@ void DomeMotor::m_automationInit(void)
   // Debugging.
   // ----------
 
-  #ifdef DEBUG
+  #if defined(DEBUG)
   output = m_className+F("m_automationInit()");
   output += F(" - ");
   output += F("Turn set");
@@ -395,7 +363,7 @@ void DomeMotor::m_automationReady(void)
     // Debugging.
     // ----------
 
-    #ifdef DEBUG
+    #if defined(DEBUG)
     output = m_className+F("m_automationReady()");
     output += F(" - ");
     output += F("Ready to turn");
@@ -415,14 +383,14 @@ void DomeMotor::m_automationTurn(void)
     // Actively turn the dome until it reaches its stop time.
     // ------------------------------------------------------
 
-    #ifdef DEBUG
+    #if defined(DEBUG)
     output = m_className+F("m_automationTurn()");
     output += F(" - ");
     output += F("Turning.");
     printOutput();
     #endif
 
-    int rotationSpeed = DOME_AUTO_SPEED * m_turnDirection;
+    int rotationSpeed = m_settings[iAutoSpeed] * m_turnDirection;
     m_rotateDome(rotationSpeed);
   } 
   else {
@@ -431,7 +399,7 @@ void DomeMotor::m_automationTurn(void)
     // Turn completed. Stop the motor.
     // -------------------------------
 
-    #ifdef DEBUG
+    #if defined(DEBUG)
     output = m_className+F("m_automationTurn()");
     output += F(" - ");
     output += F("Stop turning.");

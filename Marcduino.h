@@ -2,37 +2,26 @@
  *    B.L.A.C.Box: Brian Lubkeman's Astromech Controller
  * =================================================================================
  * Peripheral_Marcduino.h - Library for the Marcduino system
- * Created by Brian Lubkeman, 23 March 2021
+ * Created by Brian Lubkeman, 4 May 2021
  * Inspired by S.H.A.D.O.W. controller code written by KnightShade
  * Released into the public domain.
  */
-#ifndef _MARCDUINO_H_
-#define _MARCDUINO_H_
+#ifndef __BLACBOX_MARCDUINO_H__
+#define __BLACBOX_MARCDUINO_H__
 
 #include "Controller.h"
 
-#if defined(DEBUG) || defined(TEST_CONTROLLER)
+#define DEBUG
+
+#if defined(DEBUG)
 extern String output;
 extern void printOutput(void);
 #endif
-
 extern String getPgmString(const char *);
-
-#ifdef MARCDUINO
 extern HardwareSerial &MD_Dome_Serial;
-#ifdef MD_BODY_MASTER
 extern HardwareSerial &MD_Body_Serial;
-#endif
-#endif
 
 const int MARCDUINO_BAUD_RATE = 9600;  // Do not change this!
-const byte OPEN = 0;
-const byte CLOSE = 1;
-
-
-/* ==========================================
- *           Custom data structures
- * ========================================== */
 
 typedef struct {
   byte panelNbr;
@@ -42,6 +31,24 @@ typedef struct {
   bool completed;
 } Panel_Routine_Struct;
 
+enum marcduino_setting_index_e {
+  iFxCntl,      // 0  - FX control system.
+  iBodyMaster,  // 1  - Marcduino body master is used.
+  iSoundMaster, // 2  - Marcduino master controling sound.
+  iCmdSet,      // 3  - Marcduino command set.
+  iSoundBoard,  // 4  - Sound board.
+  iBodyPanels,  // 5  - Number of body panels on servos.
+  iDomePanels,  // 6  - Number of dome panels on servos.
+  iHp,          // 7  - Number of holoprojectors on servos.
+  iHpDelayMin,  // 8  - HP automation delay min.
+  iHpDelayMax,  // 9  - HP automation delay max.
+  iRadio        // 10 - Feather radio in use 
+};
+
+enum panel_action_e {
+  OPEN,
+  CLOSE
+};
 
 /* =========================================================
  *           Marcduino class definition
@@ -49,13 +56,8 @@ typedef struct {
 class Marcduino {
 
   private:
-    #if defined(PS5_CONTROLLER)
-    Controller_PS5 * m_controller;
-    #elif defined(PS4_CONTROLLER)
-    Controller_PS4 * m_controller;
-    #else
-    Controller_PS3 * m_controller;
-    #endif
+    Controller* m_controller;
+    byte* m_settings;
 
     int m_buttonIndex;
     bool m_holoAutomationRunning;
@@ -146,6 +148,9 @@ class Marcduino {
     void m_soundRandomOff(void);
     void m_soundStop(void);
     void m_soundScream(void);
+    void m_soundWave(void);
+    void m_soundFastWave(void);
+    void m_soundWave2(void);
     void m_soundFaint(void);
     void m_soundLeia(void);
     void m_soundShortCantina(void);
@@ -164,18 +169,13 @@ class Marcduino {
     String m_leftPad(uint8_t n, char c, uint8_t width);
     bool m_inList(const uint8_t valueToFind, const uint8_t list[]);
 
-    #ifdef DEBUG
+    #if defined(DEBUG)
     String m_className;
     #endif
 
   public:
-    #if defined(PS5_CONTROLLER)
-    Marcduino(Controller_PS5 * pController);
-    #elif defined(PS4_CONTROLLER)
-    Marcduino(Controller_PS4 * pController);
-    #else
-    Marcduino(Controller_PS3 * pController);
-    #endif
+    Marcduino(Controller* pController, const byte settings[]);
+    ~Marcduino(void);
     void begin(void);
     void interpretController(void);
     void runHoloAutomation(void);

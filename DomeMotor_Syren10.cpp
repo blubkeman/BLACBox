@@ -2,64 +2,55 @@
  *    B.L.A.C.Box: Brian Lubkeman's Astromech Controller
  * =================================================================================
  * DomeMotor_Syren10.cpp - Library for the Syren10 dome motor controller
- * Created by Brian Lubkeman, 23 March 2021
+ * Created by Brian Lubkeman, 4 May 2021
  * Inspired by S.H.A.D.O.W. controller code written by KnightShade
  * Released into the public domain.
  */
 #include <Arduino.h>
 #include "DomeMotor.h"
 
+enum syren10_setting_index_e {
+  iAddress,   // 0 - Syren10 address.
+  iBaudRate   // 1 - Syren10 baud rate.
+};
 
-#if defined(SYREN10)
 /* ================================================================================
  *                          Syren10 Motor Controller Class
  * ================================================================================ */
 
-// We use packetized serial mode. Make certain dip switches 1 and 2 are down.
-// Dip switch 3 should up *unless and only* if you use Lipo batteries. Then it should be down.
-
-// Set the dip switches 4, 5, and 6 according to the address to be used.
-// 128 = 4,5,6 all up     132 = 6 down; 4,5 up
-// 129 = 4 down; 5,6 up   133 = 6,4 down; 5 up
-// 130 = 5 down; 4,6 up   134 = 6,5 down; 4 up
-// 131 = 4,5 down; 6 up   135 = 4,5,6 all down
-
-const int SYREN_ADDR = 129;  // Serial Address for Dome Syren
-
-const int SYREN_BAUD_RATE = 9600;  // Do not change this!
-
-
 // =====================
 //      Constructor
 // =====================
-#if defined(PS5_CONTROLLER)
-Syren10_DomeMotor::Syren10_DomeMotor(Controller_PS5 * pController) : DomeMotor(), m_syren(SYREN_ADDR, DomeMotorSerial)
-#elif defined(PS4_CONTROLLER)
-Syren10_DomeMotor::Syren10_DomeMotor(Controller_PS4 * pController) : DomeMotor(), m_syren(SYREN_ADDR, DomeMotorSerial)
-#else
-Syren10_DomeMotor::Syren10_DomeMotor(Controller_PS3 * pController) : DomeMotor(), m_syren(SYREN_ADDR, DomeMotorSerial)
-#endif
+DomeMotor_Syren10::DomeMotor_Syren10 (
+    Controller* pController,
+    const byte settings[],
+    const unsigned long timings[],
+    const int syrenSettings[] )
+  : DomeMotor(pController, settings, timings),
+    m_syren(syrenSettings[iAddress], DomeMotorSerial)
 {
   m_controller = pController;
+  m_syrenSettings = syrenSettings;
+  m_domeStopped = true;
 
   // ----------
   // Debugging.
   // ----------
 
-  #ifdef DEBUG
-  m_className = "Syren10_DomeMotor::";
+  #if defined(DEBUG)
+  m_className = "DomeMotor_Syren10::";
   #endif
 }
 
 // ====================
 //      Destructor
 // ====================
-Syren10_DomeMotor::~Syren10_DomeMotor(void) {}
+DomeMotor_Syren10::~DomeMotor_Syren10(void) {}
 
 // =================
 //      begin()
 // =================
-void Syren10_DomeMotor::begin(void)
+void DomeMotor_Syren10::begin(void)
 {
   // --------------------------------
   // Call the parent class's begin().
@@ -71,7 +62,7 @@ void Syren10_DomeMotor::begin(void)
   // Start communication with the Syren10.
   // -------------------------------------
 
-  DomeMotorSerial.begin(SYREN_BAUD_RATE);
+  DomeMotorSerial.begin(m_syrenSettings[iBaudRate]);
   m_syren.setTimeout(300);
   m_syren.stop();
 
@@ -79,7 +70,7 @@ void Syren10_DomeMotor::begin(void)
   // Debugging.
   // ----------
 
-  #ifdef DEBUG
+  #if defined(DEBUG)
   output = m_className+F("begin()");
   output += F(" - ");
   output += F("Syren10");
@@ -91,20 +82,20 @@ void Syren10_DomeMotor::begin(void)
 // ================
 //      stop()
 // ================
-void Syren10_DomeMotor::stop(void)
+void DomeMotor_Syren10::stop(void)
 {
-  if ( domeStopped ) {
+  if ( m_domeStopped ) {
     return;
   }
 
   m_syren.stop();
-  domeStopped = true;
+  m_domeStopped = true;
 
   // ----------
   // Debugging.
   // ----------
 
-  #ifdef DEBUG
+  #if defined(DEBUG)
   output = m_className+F("stop()");
   output += F(" - ");
   output += F("Stopped dome motor");
@@ -115,17 +106,17 @@ void Syren10_DomeMotor::stop(void)
 // ========================
 //      m_rotateDome()
 // ========================
-void Syren10_DomeMotor::m_rotateDome(int rotationSpeed)
+void DomeMotor_Syren10::m_rotateDome(int rotationSpeed)
 {
   m_syren.motor(rotationSpeed);
-  domeStopped = false;
+  m_domeStopped = false;
 
   // ----------
   // Debugging.
   // ----------
 
-  #ifdef DEBUG
-  if ( ! domeStopped ) {
+  #if defined(DEBUG)
+  if ( ! m_domeStopped ) {
     output = m_className+F("m_rotateDome()");
     output += F(" - ");
     if ( rotationSpeed == 0 )
@@ -143,5 +134,3 @@ void Syren10_DomeMotor::m_rotateDome(int rotationSpeed)
   }
   #endif
 }
-
-#endif
