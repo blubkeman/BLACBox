@@ -149,8 +149,6 @@ void setup() {
 
 void loop() {
 
-  controller.read();
-
   /* ========================
    *      DRIVE/STEERING
    * ======================== */
