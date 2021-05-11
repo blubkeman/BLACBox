@@ -2,7 +2,7 @@
  *    B.L.A.C.Box: Brian Lubkeman's Astromech Controller
  * =================================================================================
  * DomeMotor.h - Library for supported dome motor controllers
- * Created by Brian Lubkeman, 5 May 2021
+ * Created by Brian Lubkeman, 10 May 2021
  * Inspired by S.H.A.D.O.W. controller code written by KnightShade
  * Released into the public domain.
  */
@@ -12,18 +12,11 @@
 #include <Sabertooth.h>
 //#include "../Controller/Controller.h"
 #include "Controller.h"
+#include "DebugUtils.h"
 
 #define DEBUG
-#if defined(DEBUG)
-#define VERBOSE
-#endif
 
-extern HardwareSerial &DomeMotorSerial;
-
-#if defined(DEBUG)
-extern String output;
-extern void printOutput(void);
-#endif
+extern HardwareSerial &DomeMotor_Serial;
 
 enum automation_stage_e {
   STOPPED,
@@ -34,17 +27,16 @@ enum automation_stage_e {
 enum domeMotor_setting_index_e {
   iDomeMotorDriver,   // 0 - Dome motor driver.
   iDomeSpeed,         // 1 - Dome speed.
-  iAutoSpeed,         // 2 - Automated dome speed.
-  iAutoSpeedMin,      // 3 - Automated dome speed minimum.
-  iAutoSpeedMax,      // 4 - Automated dome speed maximum.
-  iInvertTurn,        // 5 - Invert turn direction.
-  iDomeLatency        // 6 - Serial latency.
-}; 
+  iAutoSpeedMin,      // 2 - Automated dome speed minimum.
+  iAutoSpeedMax,      // 3 - Automated dome speed maximum.
+  iAutoSpeed,         // 4 - Automated dome speed.
+  iDomeLatency        // 5 - Serial latency.
+};
 
 enum domeMotor_timing_index_e {
-  iTurn360,     // 0 - Time to turn a full 360 turn at automated dome speed.
-  iTurn360Min,  // 1 - Minimum time allowed to complete a full 360 turn.
-  iTurn360Max   // 2 - Maximum time allowed to complete a full 360 turn.
+  iTurn360Min,  // 0 - Minimum time allowed to complete a full 360 turn.
+  iTurn360Max,  // 1 - Maximum time allowed to complete a full 360 turn.
+  iTurn360,     // 2 - Time to turn a full 360 turn at automated dome speed.
 };
 
 /* ================================================================================
@@ -57,7 +49,7 @@ class DomeMotor
     byte* m_settings;
     unsigned long* m_timings;
 
-    Joystick_Dome* m_joystick;
+    Joystick_Dome* m_domeStick;
     Button* m_button;
 
     bool m_domeStopped;
@@ -78,16 +70,12 @@ class DomeMotor
 
     virtual void m_rotateDome(int rotationSpeed) {};
 
-    #if defined(DEBUG)
-    String m_className;
-    #endif
-
   public:
     DomeMotor(Controller* pController, const byte settings[], const unsigned long timings[]);
     ~DomeMotor(void);
     void begin(void);
     void interpretController(void);
-    void runHoloAutomation(void);
+    void runAutomation(void);
     bool isAutomationRunning(void);
 
     virtual void stop(void) {};
@@ -99,7 +87,6 @@ class DomeMotor_Syren10 : public DomeMotor
 {
   private:
     Sabertooth m_syren;
-
     int* m_syrenSettings;
 
     virtual void m_rotateDome(int rotationSpeed);

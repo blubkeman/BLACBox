@@ -2,7 +2,7 @@
  *    B.L.A.C.Box: Brian Lubkeman's Astromech Controller
  * =================================================================================
  * DriveMotor_Roboteq.cpp - Library for the Roboteq SBL2360 or SBL1360 drive motor controller
- * Created by Brian Lubkeman, 5 May 2021
+ * Created by Brian Lubkeman, 10 May 2021
  * Inspired by S.H.A.D.O.W. controller code written by KnightShade
  * Released into the public domain.
  */
@@ -11,6 +11,15 @@
 
 const int ROBOTEQ_BAUD_RATE = 115200;     // I strongly recommend not changing this.
 
+enum comm_mode_e {
+  Pulse,
+  RS232
+};
+
+enum mixing_e {
+  byDriver,
+  bySketch
+};
 
 /* ================================================================================
  *                         Roboteq Motor Controller Class
@@ -19,19 +28,14 @@ const int ROBOTEQ_BAUD_RATE = 115200;     // I strongly recommend not changing t
 // =====================
 //      Constructor
 // =====================
-DriveMotor_Roboteq::DriveMotor_Roboteq(
-    Controller* pController,
+DriveMotor_Roboteq::DriveMotor_Roboteq
+  ( Controller* pController,
     const int settings[],
-    const byte pins[])
+    const byte pins[],
+    const byte roboteqSettings[] )
   : DriveMotor(pController, settings, pins)
 {
-  // ----------
-  // Debugging.
-  // ----------
-
-  #if defined(DEBUG)
-  m_className = "DriveMotor_Roboteq::";
-  #endif
+  m_roboteqSettings = roboteqSettings;
 }
 
 // ====================
@@ -56,7 +60,7 @@ void DriveMotor_Roboteq::begin(void)
 
   m_scriptSignal.attach(m_pins[iScriptPin]);
 
-  if ( m_settings[iCommMode] == 0 ) {
+  if ( m_roboteqSettings[iCommMode] == Pulse ) {
 
     // Pulse mode
 
@@ -66,11 +70,11 @@ void DriveMotor_Roboteq::begin(void)
     m_pulse2Signal.attach(m_pins[iDrivePin2]);
     m_pulse2Signal.write(m_servoCenter);
 
-  } else if ( m_settings[iCommMode] == 1 ) {
+  } else if ( m_settings[iCommMode] == RS232 ) {
 
     // RS232 (Serial) mode
 
-    DriveSerial.begin(ROBOTEQ_BAUD_RATE);
+    DriveMotor_Serial.begin(ROBOTEQ_BAUD_RATE);
 
   } else {
 
@@ -79,17 +83,8 @@ void DriveMotor_Roboteq::begin(void)
     return;
   }
 
-  // ----------
-  // Debugging.
-  // ----------
-
   #if defined(DEBUG)
-  output = m_className+F("begin()");
-  output += F(" - ");
-  output += F("Roboteq");
-  output += F(" motor controller started.");
-  displayInit();
-  printOutput();
+  Debug.print(DBG_INFO, F("DriveMotor_Roboteq"), F("begin()"), F("Roboteq motor controller started"));
   #endif
 }
 
@@ -106,32 +101,25 @@ void DriveMotor_Roboteq::stop(void)
     return;
   }
 
-  // ----------
-  // Debugging.
-  // ----------
-
   #if defined(DEBUG)
-  output = m_className+F("stop()");
-  output += F(" - ");
-  output += F("Stop drive motors");
-  printOutput();
+  Debug.print(DBG_WARNING, F("DriveMotor_Roboteq"), F("stop()"), F("Stop drive motors"));
   #endif
 
   // ----------------------
   // Send the stop command.
   // ----------------------
 
-  if ( m_settings[iCommMode] == 0 ) {
+  if ( m_settings[iCommMode] == Pulse ) {
 
     // Pulse mode
 
     m_writePulse(m_servoCenter);
 
-  } else if ( m_settings[iCommMode] == 1 ) {
+  } else if ( m_settings[iCommMode] == RS232 ) {
 
     // RS232 (Serial) mode
 
-    m_serialWrite(F("!MS 1_!MS 2\\r"));
+    m_writeSerial(F("!MS 1_!MS 2\\r"));
 
   } else {
 
@@ -156,13 +144,13 @@ void DriveMotor_Roboteq::m_drive(void)
   // Get the inputs based on the throttle and steering values from the joystick.
   // ---------------------------------------------------------------------------
 
-  if ( m_settings[iMixing] == 0 ) {
+  if ( m_settings[iMixing] == byDriver ) {
 
     // Mixing is done by the motor driver.
 
-    m_mapInputs(m_steering, m_throttle);
+    m_analogToServo(m_steering, m_throttle);
 
-  } else if ( m_settings[iMixing] == 1 ) {
+  } else if ( m_roboteqSettings[iMixing] == bySketch ) {
 
     // Mixing is handled by this sketch.
 
@@ -187,21 +175,18 @@ void DriveMotor_Roboteq::m_drive(void)
   // Send the values to the Roboteq.
   // -------------------------------
 
-  if ( m_settings[iCommMode] == 0 ) {
+  if ( m_settings[iCommMode] == Pulse ) {
 
     // Pulse mode
 
     m_writePulse(m_input1, m_input2);
-  } else if ( m_settings[iCommMode] == 1 ) {
+  } else if ( m_settings[iCommMode] == RS232 ) {
 
     // RS232 (Serial) mode
 
-    String cmd = F("!G 1 ");
-    cmd += m_input1;
-    cmd += F("_!G 2 ");
-    cmd += m_input2;
-    cmd += F("\\r");
-    m_serialWrite(cmd);
+    char cmd[22];
+    sprintf(cmd, "!G 1 %i_!G 2 %i\\r", m_input1, m_input2);
+    m_writeSerial(cmd);
 
   } else {
 
@@ -217,17 +202,9 @@ void DriveMotor_Roboteq::m_drive(void)
   driveStopped = false;
 
   #if defined(DEBUG)
-  output = m_className+F("m_drive()");
-  output += F(" - ");
-  output += F("Throttle/Steering: ");
-  output += m_input1;
-  output += F("/");
-  output += m_input2;
-  output += F("\tmS:");
-  output += (544 + round(m_input1 * 10.311));
-  output += F("/");
-  output += (544 + round(m_input2 * 10.311));
-  printOutput();
+  char buff[22];
+  sprintf(buff, "%i/%i (%i/%i ms)", m_input1, m_input2, (544 + round(m_input1 * 10.311)), (544 + round(m_input2 * 10.311)));
+  Debug.print(DBG_VERBOSE, F("DriveMotor_Roboteq"), F("m_drive()"), F("Throttle/Steering: "), (String)buff);
   #endif
 
   // ----------------------------
@@ -238,18 +215,18 @@ void DriveMotor_Roboteq::m_drive(void)
   m_previousInput2 = m_input2;
 }
 
-// =======================
-//      m_mapInputs()
-// =======================
-void DriveMotor_Roboteq::m_mapInputs(int steering, int throttle)
+// ===========================
+//      m_analogToServo()
+// ===========================
+void DriveMotor_Roboteq::m_analogToServo(int steering, int throttle)
 {
   // ----------------------------------------------------------------------
-  // Map the stick into the servo value range of 0 to 180 degrees.
+  // Map the joystick into the servo value range of 0 to 180 degrees.
   // Invert the throttle signal so that forward is high and reverse is low.
   // ----------------------------------------------------------------------
 
-  m_input1 = map(throttle, m_joystick->minValue, m_joystick->maxValue, m_servoMax, m_servoMin);
-  m_input2 = map(steering, m_joystick->minValue, m_joystick->maxValue, m_servoMin, m_servoMax);
+  m_input1 = map(throttle, m_driveStick->minValue, m_driveStick->maxValue, m_servoMax, m_servoMin);
+  m_input2 = map(steering, m_driveStick->minValue, m_driveStick->maxValue, m_servoMin, m_servoMax);
 
   // ----------------------------------------------------------------------
   // The check the dead zone once more. This time checking the servo range.
@@ -282,4 +259,80 @@ void DriveMotor_Roboteq::m_writePulse(int input)
 void DriveMotor_Roboteq::m_writeScript(void)
 {
   m_scriptSignal.write(speedProfile);
+}
+
+
+// ====================
+//      m_mixBHD()
+// ====================
+void DriveMotor_Roboteq::m_mixBHD(byte stickX, byte stickY) {
+/* =============================================================
+ *  This is my interpretation of BigHappyDude's mixing function for differential (tank) style driving using two motors.  
+ *  We will take the joystick's X and Y positions, mix these into a diamond matrix, and convert to a servo value range 
+ *   (0-180) for the left and right foot motors.
+ *  The maximum drive speed BHD used is excluded in this version as that is handled through a script in the Roboteq.
+ *  If you wish to understand how this works, please see the comments in the mixBHD function implemented into the
+ *   SHADOW_MD_Q85 code.
+ * ============================================================= */
+
+  if ( stickX == m_driveStick->center && stickY == m_driveStick->center ) {
+
+    m_input1=m_servoCenter;
+    m_input2=m_servoCenter;
+    return;
+
+  }
+
+  int xInt = 0;
+  int yInt = 0;
+
+  if (stickY < m_driveStick->center) {
+    yInt = map(stickY, m_driveStick->minValue, (m_driveStick->center - m_driveStick->deadZone), 100, 1);
+  } else {
+    yInt = map(stickY, (m_driveStick->center + m_driveStick->deadZone), m_driveStick->maxValue, -1, -100);
+  }
+
+  if (stickX < m_driveStick->center) {
+    xInt = map(stickX, m_driveStick->minValue, (m_driveStick->center - m_driveStick->deadZone), -100, -1);
+  } else {
+    xInt = map(stickX, (m_driveStick->center + m_driveStick->deadZone), m_driveStick->maxValue, 1, 100);
+  }
+
+  float xFloat = xInt;
+  float yFloat = yInt;
+
+  if ( yInt > (xInt + 100) ) {
+    xFloat = -100 / (1 - (yFloat / xFloat));
+    yFloat = xFloat + 100;
+  } else if ( yInt > (100 - xInt) ) {
+    xFloat = -100 / (-1 - (yFloat / xFloat));
+    yFloat = -xFloat + 100;
+  } else if (yInt < (-xInt - 100)) {
+    xFloat = 100 / (-1 - (yFloat / xFloat));
+    yFloat = -xFloat - 100;
+  } else if (yInt < (xInt - 100)) {
+    xFloat = 100 / (1 - (yFloat / xFloat));
+    yFloat = xFloat - 100;
+  }
+
+  float leftSpeed = ((xFloat + yFloat - 100) / 2) + 100;
+  leftSpeed = (leftSpeed - 50) * 2;
+
+  float rightSpeed = ((yFloat - xFloat - 100) / 2) + 100;
+  rightSpeed = (rightSpeed - 50) * 2;
+
+  m_input1=map(leftSpeed, -100, 100, m_servoMax, m_servoMin);
+  m_input2=map(rightSpeed, -100, 100, m_servoMax, m_servoMin);
+}
+
+// =======================
+//      m_writeSerial()
+// =======================
+void DriveMotor_Roboteq::m_writeSerial(String inStr)
+{
+  if (DriveMotor_Serial.available()) {
+    for (int i=0; i<inStr.length(); i++) {
+      DriveMotor_Serial.write(inStr[i]);
+    }
+  }
 }

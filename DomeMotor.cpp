@@ -2,7 +2,7 @@
  *    B.L.A.C.Box: Brian Lubkeman's Astromech Controller
  * =================================================================================
  * DomeMotor.cpp - Library for supported dome motor controllers
- * Created by Brian Lubkeman, 5 May 2021
+ * Created by Brian Lubkeman, 10 May 2021
  * Inspired by S.H.A.D.O.W. controller code written by KnightShade
  * Released into the public domain.
  */
@@ -22,11 +22,10 @@ DomeMotor::DomeMotor(Controller* pController, const byte settings[], const unsig
   m_settings = settings;
   m_timings  = timings;
 
-  m_joystick = &m_controller->domeStick;
+  m_domeStick = &m_controller->domeStick;
   m_button = &m_controller->button;
 
   m_rotationStatus = STOPPED;
-  m_turnDirection  = m_settings[iInvertTurn];
 
   m_targetPosition = 0;  // (0 - 359) - degrees in a circle, 0 = home
   m_stopTurnTime   = 0;
@@ -35,14 +34,6 @@ DomeMotor::DomeMotor(Controller* pController, const byte settings[], const unsig
 
   m_automationRunning = false;
   m_automationSettingsInvalid = false;
-
-  // ----------
-  // Debugging.
-  // ----------
-
-  #if defined(DEBUG)
-  m_className = F("DomeMotor::");
-  #endif
 }
 
 // ====================
@@ -72,19 +63,14 @@ void DomeMotor::begin(void)
 
     m_automationSettingsInvalid = true;
 
-    #if defined(VERBOSE)
-    output = m_className+F("begin()");
-    output += F(" - ");
-    output += F("Invalid settings.");
-    output += F("\n");
-    output += F("  Turn time: ");  output += m_timings[iTurn360];
-    output += F("\t Min: ");       output += m_timings[iTurn360Min];
-    output += F("\t Max: ");       output += m_timings[iTurn360Max];
-    output += F("\n");
-    output += F("  Dome speed: "); output += m_settings[iAutoSpeed];
-    output += F("\t Min: ");       output += m_settings[iAutoSpeedMin];
-    output += F("\t Max: ");       output += m_settings[iAutoSpeedMax];
-    printOutput();
+    #if defined(DEBUG)
+    Debug.print(DBG_ERROR, F("DomeMotor"), F("begin()"), F("Invalid settings"));
+    Debug.print(DBG_VERBOSE, F("  Turn time: "),  (String)m_timings[iTurn360]);
+    Debug.print(DBG_VERBOSE, F("\t Min: "),       (String)m_timings[iTurn360Min]);
+    Debug.print(DBG_VERBOSE, F("\t Max: "),       (String)m_timings[iTurn360Max]);
+    Debug.print(DBG_VERBOSE, F("  Dome speed: "), (String)m_settings[iAutoSpeed]);
+    Debug.print(DBG_VERBOSE, F("\t Min: "),       (String)m_settings[iAutoSpeedMin]);
+    Debug.print(DBG_VERBOSE, F("\t Max: "),       (String)m_settings[iAutoSpeedMax]);
     #endif
   }
 }
@@ -113,10 +99,7 @@ void DomeMotor::interpretController(void)
 
   if ( m_controller->connectionStatus() == NONE ) {
     #if defined(DEBUG)
-    output = m_className+F("interpretController()");
-    output += F(" - ");
-    output += F("No controller");
-    printOutput();
+    Debug.print(DBG_WARNING, F("DomeMotor"), F("interpretController()"), F("No controller"));
     #endif
     return;
   }
@@ -151,8 +134,8 @@ void DomeMotor::interpretController(void)
   // When L1|R1 is pressed, anticipate L3|R3 being pressed.
   // When this happens, do not read the stick position.
 
-  if ( (m_joystick->side == left && m_button->pressed(L1)) ||
-       (m_joystick->side == right && m_button->pressed(R1)) ) {
+  if ( (m_domeStick->side == left && m_button->pressed(L1)) ||
+       (m_domeStick->side == right && m_button->pressed(R1)) ) {
     return;
   }
 
@@ -160,17 +143,17 @@ void DomeMotor::interpretController(void)
   // Get the joystick position.
   // --------------------------
 
-  byte stickPosition = m_joystick->center;
+  byte stickPosition = m_domeStick->center;
 
   if ( m_controller->getType() != 0 ) {
     // The controller is a PS3, PS4, or PS5 controller.
-    stickPosition = m_joystick->rotation();
+    stickPosition = m_domeStick->rotation();
   } else if ( m_controller->connectionStatus() == FULL ) {
     // The controller is a pair of PS3 Move Navigations.
-    stickPosition = m_joystick->rotation();
+    stickPosition = m_domeStick->rotation();
   } else if ( m_button->pressed(L2) ) {
     // The controller is a single PS3 Move Navigation.
-    stickPosition = m_joystick->rotation();
+    stickPosition = m_domeStick->rotation();
   } else {
     return;
   }
@@ -180,7 +163,7 @@ void DomeMotor::interpretController(void)
   // Stop dome rotation when the stick is centered.
   // -----------------------------------------------------
   
-  if ( abs(stickPosition - m_joystick->center) < m_joystick->deadZone ) {
+  if ( abs(stickPosition - m_domeStick->center) < m_domeStick->deadZone ) {
     stop();
     return;
   }
@@ -189,7 +172,7 @@ void DomeMotor::interpretController(void)
   // Convert the joystick position to a rotation speed.
   // --------------------------------------------------
 
-  int rotationSpeed = map(stickPosition, m_joystick->minValue, m_joystick->maxValue, -m_settings[iDomeSpeed], m_settings[iDomeSpeed]);
+  int rotationSpeed = map(stickPosition, m_domeStick->minValue, m_domeStick->maxValue, -m_settings[iDomeSpeed], m_settings[iDomeSpeed]);
 
   // -------------------------------------------
   // Turn off dome automation if manually moved.
@@ -227,16 +210,8 @@ void DomeMotor::m_automationOn(void)
 {
   m_automationRunning = true;
 
-  // ----------
-  // Debugging.
-  // ----------
-
   #if defined(DEBUG)
-  output = m_className+F("automationOn()");
-  output += F(" - ");
-  output += F("Dome automation");
-  output += F(" enabled.");
-  printOutput();
+  Debug.print(DBG_INFO, F("DomeMotor"), F("automationOn()"), F("Dome automation"), F("enabled."));
   #endif
 }
 
@@ -249,23 +224,15 @@ void DomeMotor::m_automationOff(void)
   m_rotationStatus = STOPPED;
   m_targetPosition = 0;
 
-  // ----------
-  // Debugging.
-  // ----------
-
   #if defined(DEBUG)
-  output = m_className+F("automationOff()");
-  output += F(" - ");
-  output += F("Dome automation");
-  output += F(" disabled.");
-  printOutput();
+  Debug.print(DBG_INFO, F("DomeMotor"), F("automationOff()"), F("Dome automation"), F("disabled."));
   #endif
 }
 
 // =========================
-//      runHoloAutomation()
+//      runAutomation()
 // =========================
-void DomeMotor::runHoloAutomation(void)
+void DomeMotor::runAutomation(void)
 {
   // ----------------------------------------------
   // Do not run automation if settings are invalid.
@@ -336,21 +303,13 @@ void DomeMotor::m_automationInit(void)
   // ---------------------------
   
   m_rotationStatus = READY;
-   
-  // ----------
-  // Debugging.
-  // ----------
 
-  #if defined(VERBOSE)
-  output = m_className+F("m_automationInit()");
-  output += F(" - ");
-  output += F("Turn set");
-  output += F("\n");
-  output += F("  Current time: ");    output += currentTime;        output += F("\n");
-  output += F("  Target position: "); output += m_targetPosition;   output += F("\n");
-  output += F("  Next start time: "); output += m_startTurnTime;    output += F("\n");
-  output += F("  Next stop time:  "); output += m_stopTurnTime;
-  printOutput();
+  #if defined(DEBUG)
+  Debug.print(DBG_VERBOSE, F("DomeMotor"), F("m_automationInit()"), F("Turn set"));
+  Debug.print(DBG_VERBOSE, F("  Current time: "),    (String)currentTime);
+  Debug.print(DBG_VERBOSE, F("  Target position: "), (String)m_targetPosition);
+  Debug.print(DBG_VERBOSE, F("  Next start time: "), (String)m_startTurnTime);
+  Debug.print(DBG_VERBOSE, F("  Next stop time:  "), (String)m_stopTurnTime);
   #endif
 }
 
@@ -367,15 +326,8 @@ void DomeMotor::m_automationReady(void)
 
     m_rotationStatus = TURNING;
 
-    // ----------
-    // Debugging.
-    // ----------
-
-    #if defined(VERBOSE)
-    output = m_className+F("m_automationReady()");
-    output += F(" - ");
-    output += F("Ready to turn");
-    printOutput();
+    #if defined(DEBUG)
+    Debug.print(DBG_INFO, F("DomeMotor"), F("m_automationReady()"), F("Ready to turn"));
     #endif
   }
 }
@@ -391,11 +343,8 @@ void DomeMotor::m_automationTurn(void)
     // Actively turn the dome until it reaches its stop time.
     // ------------------------------------------------------
 
-    #if defined(VERBOSE)
-    output = m_className+F("m_automationTurn()");
-    output += F(" - ");
-    output += F("Turning.");
-    printOutput();
+    #if defined(DEBUG)
+    Debug.print(DBG_INFO, F("DomeMotor"), F("m_automationTurn()"), F("Turning"));
     #endif
 
     int rotationSpeed = m_settings[iAutoSpeed] * m_turnDirection;
@@ -407,11 +356,8 @@ void DomeMotor::m_automationTurn(void)
     // Turn completed. Stop the motor.
     // -------------------------------
 
-    #if defined(VERBOSE)
-    output = m_className+F("m_automationTurn()");
-    output += F(" - ");
-    output += F("Stop turning.");
-    printOutput();
+    #if defined(DEBUG)
+    Debug.print(DBG_INFO, F("DomeMotor"), F("m_automationTurn()"), F("Stop turning"));
     #endif
 
     stop();

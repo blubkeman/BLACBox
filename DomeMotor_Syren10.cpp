@@ -2,16 +2,17 @@
  *    B.L.A.C.Box: Brian Lubkeman's Astromech Controller
  * =================================================================================
  * DomeMotor_Syren10.cpp - Library for the Syren10 dome motor controller
- * Created by Brian Lubkeman, 5 May 2021
+ * Created by Brian Lubkeman, 10 May 2021
  * Inspired by S.H.A.D.O.W. controller code written by KnightShade
  * Released into the public domain.
  */
 #include <Arduino.h>
 #include "DomeMotor.h"
 
+const int SYREN10_BAUD_RATE = 9600;     // It is strongly recommended not to change this.
+
 enum syren10_setting_index_e {
-  iAddress,   // 0 - Syren10 address.
-  iBaudRate   // 1 - Syren10 baud rate.
+   iAddress   // 0 - Syren10 address.
 };
 
 /* ================================================================================
@@ -27,19 +28,11 @@ DomeMotor_Syren10::DomeMotor_Syren10 (
     const unsigned long timings[],
     const int syrenSettings[] )
   : DomeMotor(pController, settings, timings),
-    m_syren(syrenSettings[iAddress], DomeMotorSerial)
+    m_syren(syrenSettings[iAddress], DomeMotor_Serial)
 {
   m_controller = pController;
   m_syrenSettings = syrenSettings;
   m_domeStopped = true;
-
-  // ----------
-  // Debugging.
-  // ----------
-
-  #if defined(DEBUG)
-  m_className = "DomeMotor_Syren10::";
-  #endif
 }
 
 // ====================
@@ -62,20 +55,12 @@ void DomeMotor_Syren10::begin(void)
   // Start communication with the Syren10.
   // -------------------------------------
 
-  DomeMotorSerial.begin(m_syrenSettings[iBaudRate]);
+  DomeMotor_Serial.begin(SYREN10_BAUD_RATE);
   m_syren.setTimeout(300);
   m_syren.stop();
 
-  // ----------
-  // Debugging.
-  // ----------
-
   #if defined(DEBUG)
-  output = m_className+F("begin()");
-  output += F(" - ");
-  output += F("Syren10");
-  output += F(" motor controller started.");
-  printOutput();
+  Debug.print(DBG_INFO, F("DomeMotor_Syren10"), F("Syren10 motor controller started"));
   #endif
 }
 
@@ -91,15 +76,8 @@ void DomeMotor_Syren10::stop(void)
   m_syren.stop();
   m_domeStopped = true;
 
-  // ----------
-  // Debugging.
-  // ----------
-
   #if defined(DEBUG)
-  output = m_className+F("stop()");
-  output += F(" - ");
-  output += F("Stopped dome motor");
-  printOutput();
+  Debug.print(DBG_INFO, F("DomeMotor_Syren10"), F("stop()"), F("Stopped dome motor"));
   #endif
 }
 
@@ -111,26 +89,17 @@ void DomeMotor_Syren10::m_rotateDome(int rotationSpeed)
   m_syren.motor(rotationSpeed);
   m_domeStopped = false;
 
-  // ----------
-  // Debugging.
-  // ----------
-
   #if defined(DEBUG)
   if ( ! m_domeStopped ) {
-    output = m_className+F("m_rotateDome()");
-    output += F(" - ");
     if ( rotationSpeed == 0 )
-      output += F("Stopping dome.");
+      Debug.print(DBG_VERBOSE, F("DomeMotor_Syren10"), F("m_rotateDome()"), F("Stopping dome"));
     else {
-      output += F("Rotate dome at speed ");
-      output += rotationSpeed;
       if ( rotationSpeed < 0 ) {
-        output += F(" CCW.");
+        Debug.print(DBG_VERBOSE, F("DomeMotor_Syren10"), F("m_rotateDome()"), F("Rotate dome at speed "), (String)rotationSpeed);
       } else {
-        output += F(" CW.");
+        Debug.print(DBG_VERBOSE, F("DomeMotor_Syren10"), F("m_rotateDome()"), F("Rotate dome at speed "), (String)rotationSpeed);
       }
     }
-    printOutput();
   }
   #endif
 }

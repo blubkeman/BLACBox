@@ -2,7 +2,7 @@
  *    B.L.A.C.Box: Brian Lubkeman's Astromech Controller
  * =================================================================================
  * Peripheral_Marcduino.h - Library for the Marcduino system
- * Created by Brian Lubkeman, 5 May 2021
+ * Created by Brian Lubkeman, 10 May 2021
  * Inspired by S.H.A.D.O.W. controller code written by KnightShade
  * Released into the public domain.
  */
@@ -11,17 +11,10 @@
 
 //#include "../Controller/Controller.h"
 #include "Controller.h"
+#include "DebugUtils.h"
 
 #define DEBUG
-#if defined(DEBUG)
-//#define VERBOSE
-#endif
 
-#if defined(DEBUG)
-extern String output;
-extern void printOutput(void);
-#endif
-extern String getPgmString(const char *);
 extern HardwareSerial &MD_Dome_Serial;
 extern HardwareSerial &MD_Body_Serial;
 
@@ -89,11 +82,13 @@ class Marcduino {
     void m_midAwakeMode(void);
     void m_awakePlusMode(void);
 
+    void m_cantinaBeep(void);
     void m_cantinaDance(void);
     void m_disco(void);
     void m_faint(void);
     void m_fastWave(void);
     void m_leiaMessage(void);
+    void m_marchingAnts(void);
     void m_scream(void);
     void m_wave(void);
     void m_wave2(void);
@@ -161,10 +156,10 @@ class Marcduino {
     void m_soundWave2(void);
     void m_soundFaint(void);
     void m_soundLeia(void);
-    void m_soundShortCantina(void);
+    void m_soundBeepCantina(void);
     void m_soundStarWars(void);
     void m_soundMarch(void);
-    void m_soundLongCantina(void);
+    void m_soundCantinaDance(void);
     void m_soundDisco(void);
 
     // Volume control
@@ -177,16 +172,12 @@ class Marcduino {
     String m_leftPad(uint8_t n, char c, uint8_t width);
     bool m_inList(const uint8_t valueToFind, const uint8_t list[]);
 
-    #if defined(DEBUG)
-    String m_className;
-    #endif
-
   public:
     Marcduino(Controller* pController, const byte settings[]);
     ~Marcduino(void);
     void begin(void);
     void interpretController(void);
-    void runHoloAutomation(void);
+    void runAutomation(void);
     void runCustomPanelRoutine();
     bool isCustomPanelRunning(void);
 

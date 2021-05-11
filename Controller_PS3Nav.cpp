@@ -2,11 +2,10 @@
  *    B.L.A.C.Box: Brian Lubkeman's Astromech Controller
  * =================================================================================
  * Controller_PS3Nav.cpp - Library for supported controllers
- * Created by Brian Lubkeman, 5 May 2021
+ * Created by Brian Lubkeman, 10 May 2021
  * Inspired by S.H.A.D.O.W. controller code written by KnightShade
  * Released into the public domain.
  */
-#include <Arduino.h>
 #include "Controller.h"
 
 /* ================================================================================
@@ -16,14 +15,12 @@
 // =====================
 //      Constructor
 // =====================
-Controller_PS3Nav::Controller_PS3Nav(int settings[])
-  : Controller(settings),
+Controller_PS3Nav::Controller_PS3Nav(const int settings[], const unsigned long timings[])
+  : Controller(settings, timings),
     m_controller(&m_Btd),
     m_secondController(&m_Btd)
 {
-  #if defined(DEBUG)
-  m_className = "Controller_PS3Nav::";
-  #endif
+  m_type = 0; // 0=PS3Nav, 1=PS3, 2=PS4, 3=PS5
 }
 
 // ====================
@@ -50,22 +47,12 @@ void Controller_PS3Nav::begin(void)
   m_controller.attachOnInit(m_onInit);
   m_secondController.attachOnInit(m_onInit);
 
-  // ----------
-  // Debugging.
-  // ----------
-
   #if defined(DEBUG)
-  output = m_className+F("begin()");
-  output += F(" - ");
-  output += F("Ready to connect a");
-  output += F(" PS3Nav");
-  output += F(" controller");
-
-  output += F("\n  Drive stick:   ");
-  driveStick.displayInit();
-  output += F("\n  Dome stick:    ");
-  domeStick.displayInit();
-  printOutput();
+  Debug.print(DBG_INFO, F("Controller_PS3Nav"), F("m_onInitConnect()"), F("Ready to connect a PS3 Nav controller"));
+  Debug.print(DBG_VERBOSE, F("\n  Drive stick: "), (String)driveStick.getSide());
+  Debug.print(DBG_VERBOSE, F("\n    Dead zone: "), (String)driveStick.deadZone);
+  Debug.print(DBG_VERBOSE, F("\n   Dome stick: "), (String)domeStick.getSide());
+  Debug.print(DBG_VERBOSE, F("\n    Dead zone: "), (String)domeStick.deadZone);
   #endif
 }
 
@@ -91,26 +78,16 @@ void Controller_PS3Nav::m_onInitConnect(void)
 
   if ( connectionStatus() == NONE ) {
 
-    #ifdef DEBUG
-    output = m_className+F("m_onInitConnect()");
-    output += F(" - ");
-    output += F("Initiating connection with ");
-    output += F("primary");
-    output += F(" controller");
-    printOutput();
+    #if defined(DEBUG)
+    Debug.print(DBG_INFO, F("Controller_PS3Nav"), F("m_onInitConnect()"), F("Initiating connection with primary controller"));
     #endif
 
     m_connect(&m_controller);
 
   } else if ( connectionStatus() != FULL ) {
 
-    #ifdef DEBUG
-    output = m_className+F("_onInitConnect()");
-    output += F(" - ");
-    output += F("Initiating connection with ");
-    output += F("secondary");
-    output += F(" controller");
-    printOutput();
+    #if defined(DEBUG)
+    Debug.print(DBG_INFO, F("Controller_PS3Nav"), F("m_onInitConnect()"), F("Initiating connection with secondary controller"));
     #endif
 
     m_connect(&m_secondController);
@@ -129,11 +106,7 @@ void Controller_PS3Nav::m_connect(PS3BT * pController)
   if ( ! connected(pController) ) {
 
     #if defined(DEBUG)
-    output = m_className+F("m_connect()");
-    output += F(" - ");
-    output += F("Controller");
-    output += F(" invalid");
-    printOutput();
+    Debug.print(DBG_WARNING, F("Controller_PS3Nav"), F("m_connect()"), F("Controller invalid"));
     #endif
 
     m_disconnect(pController);
@@ -154,17 +127,12 @@ void Controller_PS3Nav::m_connect(PS3BT * pController)
   // Display which controller was connected.
   // ---------------------------------------
 
-  #ifdef DEBUG
-  output = m_className+F("m_connect()");
-  output += F(" - ");
+  #if defined(DEBUG)
   if ( pController == &m_controller ) {
-    output += F("Primary");
+    Debug.print(DBG_INFO, F("Controller_PS3Nav"), F("m_connect()"), F("Primary controller connected"));
   } else if ( pController == &m_secondController ) {
-    output += F("Secondary");
+    Debug.print(DBG_INFO, F("Controller_PS3Nav"), F("m_connect()"), F("Secondary controller connected"));
   }
-  output += F(" controller");
-  output += F(" connected");
-  printOutput();
   #endif
 
   // --------------------
@@ -176,20 +144,6 @@ void Controller_PS3Nav::m_connect(PS3BT * pController)
   } else if ( pController == &m_secondController ) {
     m_setConnectionStatus(FULL);
   }
-
-  // ----------
-  // Debugging.
-  // ----------
-
-  #if defined(DEBUG)
-  if ( connectionStatus() > NONE ) {
-    output = m_className+F("m_connect()");
-    output += F(" - ");
-    output += F("Controller");
-    output += F(" connected");
-    printOutput();
-  }
-  #endif
 }
 
 // ========================
@@ -223,17 +177,12 @@ void Controller_PS3Nav::m_disconnect(PS3BT * pController)
     m_setConnectionStatus(HALF);
   }
 
-  #ifdef DEBUG
-  output = m_className+F("m_disconnect()");
-  output += F(" - ");
+  #if defined(DEBUG)
   if ( pController == &m_controller ) {
-    output += F("Primary");
+    Debug.print(DBG_INFO, F("Controller_PS3Nav"), F("m_connect()"), F("Primary controller disconnected"));
   } else {
-    output += F("Secondary");
+    Debug.print(DBG_INFO, F("Controller_PS3Nav"), F("m_connect()"), F("Secondary controller disconnected"));
   }
-  output += F(" controller");
-  output += F(" disconnected");
-  printOutput();
   #endif
 }
 
@@ -276,7 +225,6 @@ bool Controller_PS3Nav::read()
     return false;
   } else {
     if ( m_detectCriticalFault(&m_controller) ) {
-      printOutput();
       return false;
     }
   }
@@ -288,7 +236,6 @@ bool Controller_PS3Nav::read()
       m_faultData[1].reconnect = true;
   } else {
     if ( m_detectCriticalFault(&m_secondController) ) {
-      printOutput();
       return false;
     }
   }
@@ -302,27 +249,19 @@ bool Controller_PS3Nav::read()
 
     if ( getButtonPress(PS2) ) {
 
-      #ifdef DEBUG
-      output = F("\n");
-      output += m_className+F("read()");
-      output += F(" - ");
-      output += F("Disconnecting");
-      output += F(" secondary");
-      output += F(" due to user request");
-      printOutput();
+      #if defined(DEBUG)
+      String msg = F("Disconnecting");
+      msg += F(" secondary");
+      msg += F(" due to user request");
+      Debug.print(DBG_INFO, F("Controller_PS3Nav"), F("read()"), msg);
       #endif
 
       m_disconnect(&m_secondController);
 
     } else if ( getButtonPress(PS) ) {
 
-      #ifdef DEBUG
-      output = F("\n");
-      output += m_className+F("read()");
-      output += F(" - ");
-      output += F("Disconnecting");
-      output += F(" due to user request");
-      printOutput();
+      #if defined(DEBUG)
+      Debug.print(DBG_INFO, F("Controller_PS3Nav"), F("read()"), F("Disconnecting"), F(" due to user request"));
       #endif
 
       m_disconnect(&m_controller);
@@ -358,16 +297,16 @@ bool Controller_PS3Nav::getButtonClick(int buttonEnum)
     case CIRCLE:   { return m_secondController.getButtonClick(RIGHT); }
     case CROSS:    { return m_secondController.getButtonClick(DOWN); }
     case SQUARE:   { return m_secondController.getButtonClick(LEFT); }
+    case L4:       { return (m_controller.getButtonClick(buttonEnum) || m_secondController.getButtonClick(buttonEnum)); }
+    case R4:       { return (m_controller.getButtonClick(buttonEnum) || m_secondController.getButtonClick(buttonEnum)); }
+    case L3:       { return m_controller.getButtonClick(buttonEnum); }
+    case R3:       { return m_secondController.getButtonClick(L3); }
     case L1:       { return m_controller.getButtonClick(buttonEnum); }
     case R1:       { return m_secondController.getButtonClick(L1); }
     case L2:       { return m_controller.getButtonClick(buttonEnum); }
     case R2:       { return m_secondController.getButtonClick(L2); }
-    case L3:       { return m_controller.getButtonClick(buttonEnum); }
-    case R3:       { return m_secondController.getButtonClick(L3); }
     case PS:       { return m_controller.getButtonClick(buttonEnum); }
     case PS2:      { return m_secondController.getButtonClick(PS); }
-    case L4:       { return (m_controller.getButtonClick(buttonEnum) || m_secondController.getButtonClick(buttonEnum)); }
-    case R4:       { return (m_controller.getButtonClick(buttonEnum) || m_secondController.getButtonClick(buttonEnum)); }
     default:       { return false; }
   }
 }
@@ -383,16 +322,16 @@ bool Controller_PS3Nav::getButtonPress(int buttonEnum)
     case CIRCLE:   { return m_secondController.getButtonPress(RIGHT); }
     case CROSS:    { return m_secondController.getButtonPress(DOWN); }
     case SQUARE:   { return m_secondController.getButtonPress(LEFT); }
+    case L4:       { return (m_controller.getButtonPress(buttonEnum) || m_secondController.getButtonPress(buttonEnum)); }
+    case R4:       { return (m_controller.getButtonPress(buttonEnum) || m_secondController.getButtonPress(buttonEnum)); }
+    case L3:       { return m_controller.getButtonPress(buttonEnum); }
+    case R3:       { return m_secondController.getButtonPress(L3); }
     case L1:       { return m_controller.getButtonPress(buttonEnum); }
     case R1:       { return m_secondController.getButtonPress(L1); }
     case L2:       { return m_controller.getButtonPress(buttonEnum); }
     case R2:       { return m_secondController.getButtonPress(L2); }
-    case L3:       { return m_controller.getButtonPress(buttonEnum); }
-    case R3:       { return m_secondController.getButtonPress(L3); }
     case PS:       { return m_controller.getButtonPress(buttonEnum); }
     case PS2:      { return m_secondController.getButtonPress(PS); }
-    case L4:       { return (m_controller.getButtonPress(buttonEnum) || m_secondController.getButtonPress(buttonEnum)); }
-    case R4:       { return (m_controller.getButtonPress(buttonEnum) || m_secondController.getButtonPress(buttonEnum)); }
     default:       { return false; }
   }
   return m_controller.getButtonPress(buttonEnum);
@@ -430,7 +369,7 @@ bool Controller_PS3Nav::m_detectCriticalFault(PS3BT * pController)
     // -----------------------
 
     if ( m_faultData[idx].reconnect ) {
-      if ( lagTime < pSettings[iLagReconnect] ) {
+      if ( lagTime < pTimings[iLagReconnect] ) {
         m_faultData[idx].reconnect = false;
       }
       m_faultData[idx].lastMsgTime = currentTime;
@@ -450,21 +389,13 @@ bool Controller_PS3Nav::m_detectCriticalFault(PS3BT * pController)
     // Disconnect after too much lag.
     // ------------------------------
 
-    if ( lagTime > pSettings[iLagDisconnect] ) {
+    if ( lagTime > pTimings[iLagDisconnect] ) {
 
-      #ifdef DEBUG
-      output = m_className+F("m_detectCriticalFault()");
-      output += F(" - ");
-      output += F("Disconnecting due to lag time.");
-      output += F("\n");
-      output += F("  Current time:  ");
-      output += currentTime;
-      output += F("\n");
-      output += F("  Last msg time: ");
-      output += lastMsgTime;
-      output += F("\n");
-      output += F("  Lag:           ");
-      output += lagTime;    
+      #if defined(DEBUG)
+      Debug.print(DBG_WARNING, F("Controller_PS3Nav"), F("m_detectCriticalFault()"), F("Disconnecting due to lag time."));
+      Debug.print(DBG_VERBOSE, F("  Current time:  "), (String)currentTime);
+      Debug.print(DBG_VERBOSE, F("  Last msg time: "), (String)lastMsgTime);
+      Debug.print(DBG_VERBOSE, F("  Lag:           "), (String)lagTime);
       #endif
       
       m_disconnect(pController);
@@ -477,13 +408,10 @@ bool Controller_PS3Nav::m_detectCriticalFault(PS3BT * pController)
     // ---------------------------------------------------------------
 
     if ( idx == 0 ) {
-      if ( lagTime > pSettings[iLagKillMotor] ) {
+      if ( lagTime > pTimings[iLagKillMotor] ) {
   
-        #ifdef DEBUG
-        output = m_className+F("m_detectCriticalFault()");
-        output += F(" - ");
-        output += F("Stopping drive motors due to lag.");
-        printOutput();
+        #if defined(DEBUG)
+        Debug.print(DBG_WARNING, F("Controller_PS3Nav"), F("m_detectCriticalFault()"), F("Stopping drive motors due to lag."));
         #endif      
   
         return true;  // The actual code to stop the motor is in loop() when read() fails.
@@ -506,7 +434,7 @@ bool Controller_PS3Nav::m_detectCriticalFault(PS3BT * pController)
         // Has the desired amount of time between failed checks passed?
         // ------------------------------------------------------------
         
-        unsigned long interval = ( connected(pController) ? pSettings[iLongInterval] : pSettings[iShortInterval]);
+        unsigned long interval = ( connected(pController) ? pTimings[iLongInterval] : pTimings[iShortInterval]);
         if ( currentTime > ( m_faultData[idx].pluggedStateTime + interval )) {
 
           // We have our second failed check.
@@ -515,11 +443,8 @@ bool Controller_PS3Nav::m_detectCriticalFault(PS3BT * pController)
           m_faultData[idx].badData++;
           m_faultData[idx].pluggedStateTime = 0;
 
-          #ifdef DEBUG
-          output = m_className+F("m_detectCriticalFault()");
-          output += F("\n");
-          output += F(" - ");
-          output += F("Invalid data from primary controller.");
+          #if defined(DEBUG)
+          Debug.print(DBG_WARNING, F("Controller_PS3Nav"), F("m_detectCriticalFault()"), F("Invalid data from primary controller."));
           #endif
 
           return true;
@@ -544,7 +469,7 @@ bool Controller_PS3Nav::m_detectCriticalFault(PS3BT * pController)
         m_faultData[idx].badData = 0;
       }
     }
-  
+
     if (m_faultData[idx].badData > 10) {
 
       // ----------------------------------
@@ -552,11 +477,8 @@ bool Controller_PS3Nav::m_detectCriticalFault(PS3BT * pController)
       // from the controller. Shut it down.
       // ----------------------------------
 
-      #ifdef DEBUG
-      output = m_className+F("m_detectCriticalFault()");
-      output += F("\n");
-      output += F(" - ");
-      output += F("Disconnecting due to excessive bad data.");
+      #if defined(DEBUG)
+      Debug.print(DBG_WARNING, F("Controller_PS3Nav"), F("m_detectCriticalFault()"), F("Disconnecting due to bad data."));
       #endif
 
       m_disconnect(pController);

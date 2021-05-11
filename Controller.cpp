@@ -2,11 +2,10 @@
  *    B.L.A.C.Box: Brian Lubkeman's Astromech Controller
  * =================================================================================
  * Controller.cpp - Library for supported controllers
- * Created by Brian Lubkeman, 5 May 2021
+ * Created by Brian Lubkeman, 10 May 2021
  * Inspired by S.H.A.D.O.W. controller code written by KnightShade
  * Released into the public domain.
  */
-#include <Arduino.h>
 #include "Controller.h"
 //#include "../../Security.h"
 #include "Security.h"
@@ -18,7 +17,7 @@
 // =====================
 //      Constructor
 // =====================
-Controller::Controller(const int settings[])
+Controller::Controller(const int settings[], const unsigned long timings[])
   : m_Usb(),
     m_Btd(&m_Usb),
     driveStick(settings[iDriveSide], settings[iDeadZone], this),
@@ -26,6 +25,7 @@ Controller::Controller(const int settings[])
     button(this)
 {
   pSettings = settings;
+  pTimings = timings;
 }
 
 // ====================
@@ -45,20 +45,14 @@ void Controller::begin(void)
   if (m_Usb.Init() == -1) {
 
     #if defined(DEBUG)
-    output = m_className+F("begin()");
-    output += F(" - ");
-    output += F("OSC did not start");
-    printOutput();
+    Debug.print(DBG_ERROR, F("Controller"), F("begin()"), F("OSC did not start"));
     #endif
 
     while (1);
   }
 
   #if defined(DEBUG)
-  output = m_className+F("begin()");
-  output += F(" - ");
-  output += F("Bluetooth Library Started");
-  printOutput();
+  Debug.print(DBG_ERROR, F("Controller"), F("begin()"), F("Bluetooth Library Started"));
   #endif
 }
 
@@ -96,9 +90,9 @@ void Controller::disconnecting(void)
   m_disconnectCount++;
 }
 
-int Controller::getType(void)
+byte Controller::getType(void)
 {
-  return pSettings[iCntrlType];
+  return m_type;
 }
 
 
@@ -118,38 +112,40 @@ bool Controller::m_authorized(void)
   btAddress.toUpperCase();
 
   #if defined(DEBUG)
-  output = F("\n");
-  output += m_className+F("m_authorized()");
-  output += F(" - ");
-  output += F("MAC address: ");
-  output += btAddress;
-  printOutput();
+  Debug.print(DBG_INFO, F("Controller"), F("m_authorized()"), F("MAC address:"), btAddress);
   #endif
 
   for (byte i = 0; i < sizeof(authorizedMACAddresses); i++) {
-    if (btAddress == getPgmString(authorizedMACAddresses[i])) {
+    if (btAddress == m_getPgmString(authorizedMACAddresses[i])) {
       authorized = true;
       break;
     }
   }
 
-  // ----------
-  // Debugging.
-  // ----------
-
   #if defined(DEBUG)
-  output = m_className+F("m_authorized()");
-  output += F(" - ");
-  output += F("Controller");
   if ( authorized ) {
-    output += F(" authorized");
+    Debug.print(DBG_INFO, F("Controller"), F("m_authorized()"), F("Controller authorized"));
   } else {
-    output += F(" unauthorized");
+    Debug.print(DBG_ERROR, F("Controller"), F("m_authorized()"), F("Controller unauthorized"));
   }
-  printOutput();
   #endif
 
   return authorized;
+}
+
+// =============================
+//      m_getPgmString()
+// =============================
+static String Controller::m_getPgmString(const char * inValue)
+{
+  // This function takes in a pointer to a char array that has been
+  // stored in program memory and returns its string content.
+
+  String outValue = "";
+  for (byte k = 0; k < strlen_P(inValue); k++) {
+    outValue += (char)pgm_read_byte_near(inValue + k);
+  }
+  return outValue;
 }
 
 // =================================
@@ -179,16 +175,8 @@ void Controller::m_initCriticalFault(byte idx)
   m_faultData[idx].pluggedStateTime = 0;
   m_faultData[idx].reconnect        = true;
 
-  // ----------
-  // Debugging.
-  // ----------
-
   #if defined(DEBUG)
-  output = m_className+F("m_initCriticalFault()");
-  output += F(" - ");
-  output += F("Critical fault data");
-  output += F(" initialized.");
-  printOutput();
+  Debug.print(DBG_INFO, F("Controller"), F("m_initCriticalFault()"), F("Critical fault data initialized."));
   #endif
 }
 
@@ -206,16 +194,8 @@ void Controller::m_resetCriticalFault(byte idx)
   else
     m_faultData[idx].lastMsgTime = m_faultData[idx].lastReadTime;
 
-  // ----------
-  // Debugging.
-  // ----------
-
   #if defined(DEBUG)
-  output = m_className+F("m_resetCriticalFault()");
-  output += F(" - ");
-  output += F("Critical fault data");
-  output += F(" reset.");
-  printOutput();
+  Debug.print(DBG_INFO, F("Controller"), F("m_initCriticalFault()"), F("Critical fault data reset."));
   #endif
 }
 
@@ -239,7 +219,7 @@ bool Controller::m_detectCriticalFault(void)
     // -----------------------
 
     if (m_faultData[0].reconnect ) {
-      if (lagTime < pSettings[iLagReconnect] ) {
+      if (lagTime < pTimings[iLagReconnect] ) {
        m_faultData[0].reconnect = false;
       }
       lastMsgTime = currentTime;
@@ -259,15 +239,13 @@ bool Controller::m_detectCriticalFault(void)
     // Disconnect after too much lag.
     // ------------------------------
 
-    if ( lagTime > pSettings[iLagDisconnect] ) {
+    if ( lagTime > pTimings[iLagDisconnect] ) {
 
       #if defined(DEBUG)
-      output = m_className+F("m_detectCriticalFault()");
-      output += F(" - ");
-      output += F("Disconnecting due to lag time.");  output += F("\n");
-      output += F("  Current time:  ");  output += currentTime;  output += F("\n");
-      output += F("  Last msg time: ");  output += lastMsgTime;  output += F("\n");
-      output += F("  Lag:           ");  output += lagTime;    
+      Debug.print(DBG_WARNING, F("Controller"), F("m_detectCriticalFault()"), F("Disconnecting due to lag time."));
+      Debug.print(DBG_WARNING, F("  Current time:  "), (String)currentTime);
+      Debug.print(DBG_WARNING, F("  Last msg time: "), (String)lastMsgTime);
+      Debug.print(DBG_WARNING, F("  Lag:           "), (String)lagTime);
       #endif
       
       m_disconnect();
@@ -277,13 +255,10 @@ bool Controller::m_detectCriticalFault(void)
     // Stop the drive motors after too much lag.
     // -----------------------------------------
 
-    if ( lagTime > pSettings[iLagKillMotor] ) {
+    if ( lagTime > pTimings[iLagKillMotor] ) {
 
       #if defined(DEBUG)
-      output = m_className+F("m_detectCriticalFault()");
-      output += F(" - ");
-      output += F("Stopping drive motors due to lag.");
-      printOutput();
+      Debug.print(DBG_WARNING, F("Controller"), F("m_detectCriticalFault()"), F("Stopping drive motors due to lag."));
       #endif      
 
       return true;  // The actual code to stop the motor is in loop() when read() fails.
@@ -305,7 +280,7 @@ bool Controller::m_detectCriticalFault(void)
         // Has the desired amount of time between failed checks passed?
         // ------------------------------------------------------------
 
-        unsigned long interval = ( connected() ? pSettings[iLongInterval] : pSettings[iShortInterval]);
+        unsigned long interval = ( connected() ? pTimings[iLongInterval] : pTimings[iShortInterval]);
         if ( currentTime > ( m_faultData[0].pluggedStateTime + interval )) {
 
           // -------------------------------------------------------
@@ -317,9 +292,7 @@ bool Controller::m_detectCriticalFault(void)
          m_faultData[0].pluggedStateTime = 0;
 
           #if defined(DEBUG)
-          output = m_className+F("m_detectCriticalFault()");
-          output += F(" - ");
-          output += F("Invalid data from primary controller.");
+          Debug.print(DBG_WARNING, F("Controller"), F("m_detectCriticalFault()"), F("Invalid data from primary controller."));
           #endif
 
           return true;
@@ -352,9 +325,7 @@ bool Controller::m_detectCriticalFault(void)
       // -----------------------------------------------------------------
 
       #if defined(DEBUG)
-      output = m_className+F("m_detectCriticalFault()");
-      output += F(" - ");
-      output += F("Disconnecting due to excessive bad data.");
+      Debug.print(DBG_WARNING, F("Controller"), F("m_detectCriticalFault()"), F("Disconnecting due to excessive bad data."));
       #endif
 
       m_disconnect();
@@ -374,10 +345,6 @@ bool Controller::m_detectCriticalFault(void)
 Button::Button(Controller* pController)
 {
   m_controller = pController;
-
-  #if defined(DEBUG)
-  m_className = "Button::";
-  #endif
 }
 
 // ====================
@@ -411,16 +378,16 @@ Joystick::Joystick(const byte argSide, const int argDeadZone, Controller* pContr
 // ====================
 Joystick::~Joystick(void) {}
 
-// =======================
-//      displayInit()
-// =======================
-void Joystick::displayInit(void)
+// ===================
+//      getSide()
+// ===================
+String Joystick::getSide(void)
 {
-  #if defined(DEBUG)
-  output += m_side();
-  output += F("\n    Dead zone:   ");
-  output += deadZone;
-  #endif
+  if ( side == 0 ) {
+    return "Left";
+  } else {
+    return "Right";
+  }
 }
 
 // ==================
@@ -448,18 +415,6 @@ byte Joystick::m_getY(void)
     return m_controller->getAnalogHat(RightHatY);
   } else {
     return center;
-  }
-}
-
-// ==================
-//      m_side()
-// ==================
-String Joystick::m_side(void)
-{
-  if ( side == 0 ) {
-    return "Left";
-  } else {
-    return "Right";
   }
 }
 
@@ -525,7 +480,7 @@ byte Joystick_Dome::rotation(void)
 // ==========================
 void Controller::m_displayInput(void)
 {
-  output = "";
+  String output = "";
 
   if ( connectionStatus() != NONE ) {
     if ( button.hasBasePressed() ) {
@@ -543,7 +498,7 @@ void Controller::m_displayInput(void)
     }
   }
 
-  printOutput();
+  Debug.print(DBG_VERBOSE, output);
 }
 
 // ==========================
@@ -619,7 +574,7 @@ String Button::label(int buttonEnum)
     case PS:       { return "PS"; }
     case PS2:      { return "PS2"; }
     case 4: {
-      switch (m_controller->pSettings[iCntrlType]) {
+      switch (m_controller->getType()) {
         case 0: { return "CROSS";  break; }
         case 1: { return "SELECT"; break; }
         case 2: { return "SHARE";  break; }
@@ -628,7 +583,7 @@ String Button::label(int buttonEnum)
       }
     }
     case 5: {
-      switch (m_controller->pSettings[iCntrlType]) {
+      switch (m_controller->getType()) {
         case 0: { return "CIRCLE";  break; }
         case 1: { return "START";   break; }
         case 2: { return "OPTIONS"; break; }
@@ -663,7 +618,7 @@ String Button::abbreviation(int buttonEnum)
     case PS:       { return "PS"; }
     case PS2:      { return "PS2"; }
     case 4: {
-      switch (m_controller->pSettings[iCntrlType]) {
+      switch (m_controller->getType()) {
         case 0: { return "X";  break; }
         case 1: { return "Sl"; break; }
         case 2: { return "Sh"; break; }
@@ -672,7 +627,7 @@ String Button::abbreviation(int buttonEnum)
       }
     }
     case 5: {
-      switch (m_controller->pSettings[iCntrlType]) {
+      switch (m_controller->getType()) {
         case 0: { return "O";   break; }
         case 1: { return "St";  break; }
         case 2: { return "Opt"; break; }
@@ -702,7 +657,7 @@ void Joystick::m_appendString(String* pValue)
   if ( pValue->length() > 0 ) {
     pValue->concat(F("+"));
   }
-  pValue->concat(m_side());
+  pValue->concat(getSide());
   pValue->concat(F(": "));
   pValue->concat(m_getX());
   pValue->concat(F(","));

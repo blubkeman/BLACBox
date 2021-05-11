@@ -2,28 +2,24 @@
  *    B.L.A.C.Box: Brian Lubkeman's Astromech Controller
  * =================================================================================
  * Controller.h - Library for supported controllers
- * Created by Brian Lubkeman, 5 May 2021
+ * Created by Brian Lubkeman, 10 May 2021
  * Inspired by S.H.A.D.O.W. controller code written by KnightShade
  * Released into the public domain.
  */
 #ifndef __BLACBOX_CONTROLLER_H__
 #define __BLACBOX_CONTROLLER_H__
 
+#include <Arduino.h>
 #include <usbhub.h>
 #include <BTD.h>
 #include <PS5BT.h>
 #include <PS4BT.h>
 #include <PS3BT.h>
 #include "controllerEnums.h"
+#include "DebugUtils.h"
 
 #define DEBUG
 //#define TEST_CONTROLLER
-
-#if defined(DEBUG) || defined(TEST_CONTROLLER)
-extern String output;
-extern void printOutput(void);
-#endif
-extern String getPgmString(const char *);
 
 struct CriticalFault_Struct {
   uint32_t badData;
@@ -34,16 +30,18 @@ struct CriticalFault_Struct {
 };
 
 enum controller_setting_index_e {
-  iCntrlType,       // 0 - Controller type
-  iDriveSide,       // 1 - Drive stick side
-  iDomeSide,        // 2 - Dome stick side
-  iDeadZone,        // 3 - Joystick dead zone
-  iLagKillMotor,    // 4 - Lag time to kill drive motor
-  iLagDisconnect,   // 5 - Lag time to disconnect
-  iLagReconnect,    // 6 - Lag time to reconnect
-  iShortInterval,   // 7 - USB plugged state, short interval
-  iLongInterval,    // 8 - USB plugged state, long interval
-  iPeripheralCount  // 9 - Number of peripherals (drive, dome, Marcduino)
+  iDriveSide,       // 0 - Drive stick side
+  iDomeSide,        // 1 - Dome stick side
+  iDeadZone,        // 2 - Joystick dead zone
+  iPeripheralCount  // 3 - Number of peripherals (drive, dome, Marcduino)
+};
+
+enum controller_timing_index_e {
+  iLagKillMotor,    // 0 - Lag time to kill drive motor
+  iLagDisconnect,   // 1 - Lag time to disconnect
+  iLagReconnect,    // 2 - Lag time to reconnect
+  iShortInterval,   // 3 - USB plugged state, short interval
+  iLongInterval,    // 4 - USB plugged state, long interval
 };
 
 enum connection_status_e {
@@ -66,8 +64,8 @@ enum joystick_side_e {
 
 class Controller; // Class prototype
 
-const int L4  = 4;
-const int R4  = 5;
+const int L4  = 8;
+const int R4  = 9;
 const int PS2 = 17;
 
 /* ================================================================================
@@ -77,13 +75,9 @@ class Joystick
 {
   protected:
     Controller* m_controller;
+
     byte m_getX(void);
     byte m_getY(void);
-    String m_side(void);
-
-    #if defined(DEBUG)
-    String m_className;
-    #endif
 
     #if defined(TEST_CONTROLLER)
     void m_appendString(String* inString);
@@ -99,7 +93,7 @@ class Joystick
     const int maxValue = 255;
     int deadZone;
 
-    void displayInit(void);
+    String getSide(void);
 
     #if defined(TEST_CONTROLLER)
     void display(String* out);
@@ -133,10 +127,6 @@ class Button
   private:
     Controller* m_controller;
 
-    #if defined(DEBUG)
-    String m_className;
-    #endif
-
     #if defined(TEST_CONTROLLER)
     void m_appendString(String* inString, const String addString);
     #endif
@@ -166,6 +156,7 @@ class Controller
   protected:
     USB m_Usb;
     BTD m_Btd;
+    byte m_type;
     connection_status_e m_connectionStatus;
     CriticalFault_Struct m_faultData[2];
     unsigned long m_lagTime;
@@ -173,6 +164,7 @@ class Controller
     byte m_disconnectCount;
 
     bool m_authorized(void);
+    String m_getPgmString(const char *);
     void m_setConnectionStatus(byte n);
     void m_initCriticalFault(byte idx);
     void m_resetCriticalFault(byte idx);
@@ -182,19 +174,16 @@ class Controller
     virtual bool m_getUsbStatus(void) {};
     virtual bool m_detectCriticalFault(void);
 
-    #if defined(DEBUG)
-    String m_className;
-    #endif
-
     #if defined(TEST_CONTROLLER)
     void m_displayInput(void);
     #endif
 
   public:
-    Controller(const int settings[]);
+    Controller(const int settings[], const unsigned long timings[]);
     ~Controller(void);
 
     int* pSettings;
+    unsigned long* pTimings;
     Joystick_Drive driveStick;
     Joystick_Dome domeStick;
     Button button;
@@ -203,7 +192,7 @@ class Controller
     byte connectionStatus(void);
     void disconnecting(void);
     bool isDisconnecting(void);
-    int  getType(void);
+    byte  getType(void);
 
     virtual bool read(void) {};
     virtual bool connected(void) {};
@@ -231,12 +220,8 @@ class Controller_PS3Nav : public Controller
     virtual bool m_getUsbStatus(void);
     virtual bool m_detectCriticalFault(PS3BT * pController);
 
-    #if defined(DEBUG)
-    String m_className;
-    #endif
-
   public:
-    Controller_PS3Nav(int settings[]);
+    Controller_PS3Nav(const int settings[], const unsigned long timings[]);
     virtual ~Controller_PS3Nav(void);
 
     static Controller_PS3Nav* Controller_PS3Nav::anchor;
@@ -266,12 +251,8 @@ class Controller_PS3 : public Controller
     virtual void m_disconnect(void);
     virtual bool m_getUsbStatus(void);
 
-    #if defined(DEBUG)
-    String m_className;
-    #endif
-
   public:
-    Controller_PS3(int settings[]);
+    Controller_PS3(const int settings[], const unsigned long timings[]);
     virtual ~Controller_PS3(void);
 
     static Controller_PS3* Controller_PS3::anchor;
@@ -301,12 +282,8 @@ class Controller_PS4 : public Controller
     virtual void m_disconnect(void);
     virtual bool m_getUsbStatus(void);
 
-    #if defined(DEBUG)
-    String m_className;
-    #endif
-
   public:
-    Controller_PS4(int settings[]);
+    Controller_PS4(const int settings[], const unsigned long timings[]);
     virtual ~Controller_PS4(void);
 
     static Controller_PS4* Controller_PS4::anchor;
@@ -336,12 +313,8 @@ class Controller_PS5 : public Controller
     virtual void m_disconnect(void);
     virtual bool m_getUsbStatus(void);
 
-    #if defined(DEBUG)
-    String m_className;
-    #endif
-
   public:
-    Controller_PS5(int settings[]);
+    Controller_PS5(const int settings[], const unsigned long timings[]);
     virtual ~Controller_PS5(void);
 
     static Controller_PS5* Controller_PS5::anchor;

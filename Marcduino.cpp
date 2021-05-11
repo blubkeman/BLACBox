@@ -2,7 +2,7 @@
  *    B.L.A.C.Box: Brian Lubkeman's Astromech Controller
  * =================================================================================
  * Peripheral_Marcduino.cpp - Library for the Marcduino system
- * Created by Brian Lubkeman, 5 May 2021
+ * Created by Brian Lubkeman, 10 May 2021
  * Inspired by S.H.A.D.O.W. controller code written by KnightShade
  * Released into the public domain.
  */
@@ -25,14 +25,6 @@ Marcduino::Marcduino(Controller* pController, const byte settings[])
   m_cprRunning = false;
   m_holoAutomationRunning = false;
   m_aurabesh = false;
-
-  // ----------
-  // Debugging.
-  // ----------
-
-  #if defined(DEBUG)
-  m_className = "Marcduino::";
-  #endif
 }
 
 // ====================
@@ -64,10 +56,7 @@ void Marcduino::interpretController(void)
 
   if ( m_controller->connectionStatus() == NONE ) {
     #if defined(DEBUG)
-    output = m_className+F("interpretController()");
-    output += F(" - ");
-    output += F("No controller");
-    printOutput();
+    Debug.print(DBG_VERBOSE, F("Marcduino"), F("interpretController()"), F("No controller"));
     #endif
     return;
   }
@@ -78,13 +67,9 @@ void Marcduino::interpretController(void)
 
   m_buttonIndex = m_getButtonsPressed();
 
-  #if defined(VERBOSE)
+  #if defined(DEBUG)
   if ( m_buttonIndex > -1 ) {
-    output = m_className+F("interpretController()");
-    output += F(" - ");
-    output += F("Button combo: ");
-    output += m_buttonIndex;
-    printOutput();
+    Debug.print(DBG_VERBOSE, F("Marcduino"), F("interpretController()"), F("Button combo:"), (String)m_buttonIndex);
   }
   #endif
 
@@ -92,68 +77,65 @@ void Marcduino::interpretController(void)
 
     // These mappings should mimic the SHADOW+MD controls.
 
-    #if defined(VERBOSE)
+    #if defined(DEBUG)
     if ( m_buttonIndex > -1 ) {
-      output = m_className+F("interpretController()");
-      output += F(" - ");
-      output += F("SHADOW+MD command set.");
-      printOutput();
+      Debug.print(DBG_VERBOSE, F("Marcduino"), F("interpretController()"), F("SHADOW+MD command set"));
     }
     #endif
 
     switch (m_buttonIndex) {
-      case 0 :  { m_fullAwakeMode();   break; } // UP
-      case 1 :  { m_awakePlusMode();   break; } // RIGHT
-      case 2 :  { quietMode();         break; } // DOWN
-      case 3 :  { m_midAwakeMode();    break; } // LEFT
-      case 4 :  { m_bodyPanelOpen(2);  break; } // TRIANGLE
+      case 0 :  { quietMode();         break; } // UP
+      case 1 :  { m_midAwakeMode();    break; } // RIGHT
+      case 2 :  { m_fullAwakeMode();   break; } // DOWN
+      case 3 :  { m_awakePlusMode();   break; } // LEFT
+      case 4 :  { m_marchingAnts();    break; } // TRIANGLE
       case 5 :  { m_bodyPanelClose(1); break; } // CIRCLE
-      case 6 :  { m_bodyPanelClose(2); break; } // CROSS
+      case 6 :  { m_cantinaBeep();     break; } // CROSS
       case 7 :  { m_bodyPanelOpen(1);  break; } // SQUARE
-      case 8 :  { m_cantinaDance();    break; } // L1/R1 + UP
-      case 9 :  { m_wave2();           break; } // L1/R1 + RIGHT
-      case 10 : { m_leiaMessage();     break; } // L1/R1 + DOWN
-      case 11 : { m_wave();            break; } // L1/R1 + LEFT
-      case 12 : { m_domePanelOpen(1);  break; } // L1/R1 + TRIANGLE
-      case 13 : { m_domePanelClose(2); break; } // L1/R1 + CIRCLE
-      case 14 : { m_domePanelClose(1); break; } // L1/R1 + CROSS
-      case 15 : { m_domePanelOpen(2);  break; } // L1/R1 + SQUARE
+      case 8 :  { m_leiaMessage();     break; } // L1/R1 + UP
+      case 9 :  { m_wave();            break; } // L1/R1 + RIGHT
+      case 10 : { m_cantinaDance();    break; } // L1/R1 + DOWN
+      case 11 : { m_wave2();           break; } // L1/R1 + LEFT
+      case 12 : { m_domePanelClose(1); break; } // L1/R1 + TRIANGLE
+      case 13 : { m_domePanelOpen(2);  break; } // L1/R1 + CIRCLE
+      case 14 : { m_domePanelOpen(1);  break; } // L1/R1 + CROSS
+      case 15 : { m_domePanelClose(2); break; } // L1/R1 + SQUARE
       case 16 : { m_volumeUp();        break; } // SHARE/SELECT + UP
       case 17 : { m_hpLightOn(0);      break; } // SHARE/SELECT + RIGHT
       case 18 : { m_volumeDown();      break; } // SHARE/SELECT + DOWN
       case 19 : { m_hpLightOff(0);     break; } // SHARE/SELECT + LEFT
-      case 20 : { m_volumeMax();       break; } // SHARE/SELECT + TRIANGLE
-      case 21 : { m_domePanelOpen(0);  break; } // SHARE/SELECT + CIRCLE
-      case 22 : { m_volumeMid();       break; } // SHARE/SELECT + CROSS
-      case 23 : { m_domePanelClose(0); break; } // SHARE/SELECT + SQUARE
-      case 24 : { m_scream();          break; } // OPTIONS/START + UP
-      case 25 : { m_faint();           break; } // OPTIONS/START + RIGHT
-      case 26 : { m_disco();           break; } // OPTIONS/START + DOWN
-      case 27 : { m_fastWave();        break; } // OPTIONS/START + LEFT
-      case 28 : { m_hpRandomMove(0);   break; } // OPTIONS/START + TRIANGLE
-      case 29 : { m_hpLightOff(0);     break; } // OPTIONS/START + CIRCLE
-      case 30 : { m_hpReset(0);        break; } // OPTIONS/START + CROSS
-      case 31 : { m_hpLightOn(0);      break; } // OPTIONS/START + SQUARE
-      case 32 : {                             // PS/PS2 + UP
+      case 20 : { m_volumeMid();       break; } // SHARE/SELECT + TRIANGLE
+      case 21 : { m_domePanelClose(0); break; } // SHARE/SELECT + CIRCLE
+      case 22 : { m_volumeMax();       break; } // SHARE/SELECT + CROSS
+      case 23 : { m_domePanelOpen(0);  break; } // SHARE/SELECT + SQUARE
+      case 24 : { m_disco();           break; } // OPTIONS/START + UP
+      case 25 : { m_fastWave();        break; } // OPTIONS/START + RIGHT
+      case 26 : { m_scream();          break; } // OPTIONS/START + DOWN
+      case 27 : { m_faint();           break; } // OPTIONS/START + LEFT
+      case 28 : { m_hpReset(0);        break; } // OPTIONS/START + TRIANGLE
+      case 29 : { m_hpLightOn(0);      break; } // OPTIONS/START + CIRCLE
+      case 30 : { m_hpRandomMove(0);   break; } // OPTIONS/START + CROSS
+      case 31 : { m_hpLightOff(0);     break; } // OPTIONS/START + SQUARE
+      case 32 : {                               // PS/PS2 + UP
                   m_soundPlayTrack(8, 8);
                   m_logicsStarWars();
                   break; }
-      case 33 : {                             // PS/PS2 + RIGHT
+      case 33 : {                               // PS/PS2 + RIGHT
                   m_soundPlayTrack(8, 9);
                   m_logicsReset(0);
                   break; }
-      case 34 : {                             // PS/PS2 + DOWN
+      case 34 : {                               // PS/PS2 + DOWN
                   m_soundPlayTrack(8, 10);
                   m_logicsReset(0);
                   break; }
-      case 35 : {                             // PS/PS2 + LEFT
+      case 35 : {                               // PS/PS2 + LEFT
                   m_soundPlayTrack(8, 11);
                   m_logicsReset(0);
                   break; }
-      case 36 : { m_domePanelOpen(3);  break; } // PS/PS2 + TRIANGLE
-      case 37 : { m_domePanelClose(4); break; } // PS/PS2 + CIRCLE
-      case 38 : { m_domePanelClose(3); break; } // PS/PS2 + CROSS
-      case 39 : { m_domePanelOpen(4);  break; } // PS/PS2 + SQUARE
+      case 36 : { m_domePanelClose(3); break; } // PS/PS2 + TRIANGLE
+      case 37 : { m_domePanelOpen(4);  break; } // PS/PS2 + CIRCLE
+      case 38 : { m_domePanelOpen(3);  break; } // PS/PS2 + CROSS
+      case 39 : { m_domePanelClose(4); break; } // PS/PS2 + SQUARE
       default : { break; }
     }
 
@@ -161,51 +143,48 @@ void Marcduino::interpretController(void)
 
     // This is where you may define your own button combo mappings.
 
-    #if defined(VERBOSE)
+    #if defined(DEBUG)
     if ( m_buttonIndex > -1 ) {
-      output = m_className+F("interpretController()");
-      output += F(" - ");
-      output += F("Custom command set.");
-      printOutput();
+      Debug.print(DBG_VERBOSE, F("Marcduino"), F("interpretController()"), F("Custom command set"));
     }
     #endif
     switch (m_buttonIndex) {
-      case 0 :  { break; } // UP
-      case 1 :  { break; } // RIGHT
-      case 2 :  { break; } // DOWN
-      case 3 :  { break; } // LEFT
+      case 0 :  { quietMode();             break; } // UP
+      case 1 :  { m_midAwakeMode();        break; } // RIGHT
+      case 2 :  { m_fullAwakeMode();       break; } // DOWN
+      case 3 :  { m_awakePlusMode();       break; } // LEFT
       case 4 :  { break; } // TRIANGLE
       case 5 :  { break; } // CIRCLE
       case 6 :  { break; } // CROSS
       case 7 :  { break; } // SQUARE
-      case 8 :  { break; } // L1/R1 + UP
-      case 9 :  { break; } // L1/R1 + RIGHT
-      case 10 : { break; } // L1/R1 + DOWN
-      case 11 : { break; } // L1/R1 + LEFT
-      case 12 : { break; } // L1/R1 + TRIANGLE
-      case 13 : { break; } // L1/R1 + CIRCLE
-      case 14 : { break; } // L1/R1 + CROSS
-      case 15 : { break; } // L1/R1 + SQUARE
-      case 16 : { break; } // SHARE/SELECT + UP
-      case 17 : { break; } // SHARE/SELECT + RIGHT
-      case 18 : { break; } // SHARE/SELECT + DOWN
-      case 19 : { break; } // SHARE/SELECT + LEFT
-      case 20 : { break; } // SHARE/SELECT + TRIANGLE
-      case 21 : { break; } // SHARE/SELECT + CIRCLE
-      case 22 : { break; } // SHARE/SELECT + CROSS
-      case 23 : { break; } // SHARE/SELECT + SQUARE
-      case 24 : { break; } // OPTIONS/START + UP
-      case 25 : { break; } // OPTIONS/START + RIGHT
-      case 26 : { break; } // OPTIONS/START + DOWN
-      case 27 : { break; } // OPTIONS/START + LEFT
-      case 28 : { break; } // OPTIONS/START + TRIANGLE
-      case 29 : { break; } // OPTIONS/START + CIRCLE
-      case 30 : { break; } // OPTIONS/START + CROSS
-      case 31 : { break; } // OPTIONS/START + SQUARE
-      case 32 : { break; } // PS/PS2 + UP
-      case 33 : { break; } // PS/PS2 + RIGHT
-      case 34 : { break; } // PS/PS2 + DOWN
-      case 35 : { break; } // PS/PS2 + LEFT
+      case 8 :  { m_volumeUp();            break; } // L1/R1 + UP
+      case 9 :  { m_hpReset(0);            break; } // L1/R1 + RIGHT
+      case 10 : { m_volumeDown();          break; } // L1/R1 + DOWN
+      case 11 : { m_hpRandomMove(0);       break; } // L1/R1 + LEFT
+      case 12 : { m_volumeMid();           break; } // L1/R1 + TRIANGLE
+      case 13 : { m_hpLightOn(0);          break; } // L1/R1 + CIRCLE
+      case 14 : { m_volumeMax();           break; } // L1/R1 + CROSS
+      case 15 : { m_hpLightOff(0);         break; } // L1/R1 + SQUARE
+      case 16 : { m_soundPlayTrack(1, 22); break; } // SHARE/SELECT + UP        : 022_Chatter-22.mp3
+      case 17 : { m_soundPlayTrack(2, 9);  break; } // SHARE/SELECT + RIGHT     : 034_Idle-09.mp3
+      case 18 : { m_soundPlayTrack(3, 6);  break; } // SHARE/SELECT + DOWN      : 056_Acknowledge-06.mp3
+      case 19 : { m_soundPlayTrack(4, 1);  break; } // SHARE/SELECT + LEFT      : 076_Engage-01.mp3
+      case 20 : { m_soundPlayTrack(1, 25); break; } // SHARE/SELECT + TRIANGLE  : 025_Chatter-25.mp3
+      case 21 : { m_soundPlayTrack(2, 17); break; } // SHARE/SELECT + CIRCLE    : 042_Idle-17.mp3
+      case 22 : { m_soundPlayTrack(3, 20); break; } // SHARE/SELECT + CROSS     : 070_ActionComplete-09.mp3
+      case 23 : { m_soundPlayTrack(7, 15); break; } // SHARE/SELECT + SQUARE    : 165_ThreatWarning-04.mp3
+      case 24 : { m_soundPlayTrack(4, 17); break; } // OPTIONS/START + UP       : 092_Alert-03.mp3
+      case 25 : { m_soundPlayTrack(8, 1);  break; } // OPTIONS/START + RIGHT    : 176_ImperialMarch.mp3
+      case 26 : { m_soundPlayTrack(6, 4);  break; } // OPTIONS/START + DOWN     : 129_Hurt-04.mp3
+      case 27 : { m_soundPlayTrack(8, 2);  break; } // OPTIONS/START + LEFT     : 177_DuelOfTheFates.mp3
+      case 28 : { m_soundPlayTrack(4, 22); break; } // OPTIONS/START + TRIANGLE : 097_Atack-01.mp3
+      case 29 : { m_soundPlayTrack(8, 3);  break; } // OPTIONS/START + CIRCLE   : 178_ImperialSuite.mp3
+      case 30 : { m_soundPlayTrack(7, 3);  break; } // OPTIONS/START + CROSS    : 153_Pain-03.mp3
+      case 31 : { m_soundPlayTrack(8, 4);  break; } // OPTIONS/START + SQUARE   : 179_GnRScream.mp3
+      case 32 : { m_bodyPanelOpen(1);      break; } // PS/PS2 + UP
+      case 33 : { m_bodyPanelClose(2);     break; } // PS/PS2 + RIGHT
+      case 34 : { m_bodyPanelClose(1);     break; } // PS/PS2 + DOWN
+      case 35 : { m_bodyPanelOpen(2);      break; } // PS/PS2 + LEFT
       case 36 : { break; } // PS/PS2 + TRIANGLE
       case 37 : { break; } // PS/PS2 + CIRCLE
       case 38 : { break; } // PS/PS2 + CROSS
@@ -218,10 +197,7 @@ void Marcduino::interpretController(void)
     // Unknown command set setting.
 
     #if defined(DEBUG)
-    output = m_className+F("interpretController()");
-    output += F(" - ");
-    output += F("Unknown command set.");
-    printOutput();
+    Debug.print(DBG_ERROR, F("Marcduino"), F("interpretController()"), F("Unknown command set"));
     #endif
 
     return;
@@ -307,6 +283,7 @@ void Marcduino::m_sendCommand(String inStr, HardwareSerial* targetSerial)
   //  or a Feather Radio (wireless) connection to the dome.
   // --------------------------------------------------------------
 
+  char buff[50];
   if ( m_settings[iRadio] ) {
   
     if ( targetSerial == &MD_Dome_Serial ) {
@@ -317,12 +294,8 @@ void Marcduino::m_sendCommand(String inStr, HardwareSerial* targetSerial)
       }
 
       #if defined(DEBUG)
-      output = m_className+F("m_sendCommand()");
-      output += F(" - ");
-      output += F("Sent ");
-      output += inStr;
-      output += F(" to dome via Feather Radio.");
-      printOutput();
+      sprintf(buff, "%s to dome via Feather Radio", inStr);
+      Debug.print(DBG_INFO, F("Marcduino"), F("m_sendCommand()"), buff);
       #endif
   
       return;
@@ -332,24 +305,19 @@ void Marcduino::m_sendCommand(String inStr, HardwareSerial* targetSerial)
   targetSerial->print(inStr);
 
   #if defined(DEBUG)
-  output = m_className+F("m_sendCommand()");
-  output += F(" - ");
-  output += F("Sent ");
-  output += inStr;
   if ( targetSerial == &MD_Dome_Serial ) {
-    output += F(" to dome");
+    sprintf(buff, "%s to dome via Serial", inStr);
   } else if ( targetSerial == &MD_Body_Serial ) {
-    output += F(" to body");
+    sprintf(buff, "%s to body via Serial", inStr);
   }
-  output += F(" via Serial.");
-  printOutput();
+  Debug.print(DBG_INFO, F("Marcduino"), F("m_sendCommand()"), buff);
   #endif
 }
 
 // ==================================
 //      Holoprojector Automation
 // ==================================
-void Marcduino::runHoloAutomation(void)
+void Marcduino::runAutomation(void)
 {
   if ( ! m_holoAutomationRunning ) {
     return;
@@ -843,7 +811,7 @@ void Marcduino::m_soundLeia(void)
     m_sendCommand(String((String)"$L\r"), &MD_Dome_Serial);
   }
 }
-void Marcduino::m_soundShortCantina(void)
+void Marcduino::m_soundBeepCantina(void)
 {
   if ( m_settings[iSoundMaster] == 1 ) { 
     m_sendCommand(String((String)"$c\r"), &MD_Body_Serial);
@@ -867,7 +835,7 @@ void Marcduino::m_soundMarch(void)
     m_sendCommand(String((String)"$M\r"), &MD_Dome_Serial);
   }
 }
-void Marcduino::m_soundLongCantina(void)
+void Marcduino::m_soundCantinaDance(void)
 {
   if ( m_settings[iSoundMaster] == 1 ) { 
     m_sendCommand(String((String)"$C\r"), &MD_Body_Serial);
@@ -934,12 +902,9 @@ void Marcduino::m_volumeMax(void)
 
 void Marcduino::m_runSequence(uint8_t sequenceNumber)
 {
-  #if defined(VERBOSE)
+  #if defined(DEBUG)
   if ( m_buttonIndex > -1 ) {
-    output = m_className+F("m_runSequence()");
-    output += F(" - ");
-    output += F("Sequence: "); output += sequenceNumber;
-    printOutput();
+    Debug.print(DBG_VERBOSE, F("Marcduino"), F("m_runSequence()"), F("Sequence: "),(String)sequenceNumber);
   }
   #endif
 
@@ -980,9 +945,9 @@ void Marcduino::m_runSequence(uint8_t sequenceNumber)
         case 2 : { m_soundWave();         break; }  // Wave           - happy sound (b2, #13), flash hp 4 seconds
         case 3 : { m_soundFastWave();     break; }  // Fast Wave      - moody sound (b3, #4), flash display 4 sec, hp flicker 4 sec
         case 4 : { m_soundWave2();        break; }  // Wave 2         - long happy sound (b3, #6), flash hp 3 sec
-        case 5 : { m_soundShortCantina(); break; }  // Beep Cantina   - beep cantina sound, flash hp 17 sec, spectrum display
+        case 5 : { m_soundBeepCantina();  break; }  // Beep Cantina   - beep cantina sound, flash hp 17 sec, spectrum display
         case 6 : { m_soundFaint();        break; }  // Faint/Short Circuit - faint sound, short circuit display, mp flicker 10 sec, hp flicker 10 sec
-        case 7 : { m_soundLongCantina();  break; }  // Cantina dance  - cantina sound, spectrum display, hp flicker 46 sec
+        case 7 : { m_soundCantinaDance(); break; }  // Cantina dance  - cantina sound, spectrum display, hp flicker 46 sec
         case 8 : { m_soundLeia();         break; }  // Leia           - Leia msg sound, hp 01 in RC mode, hp 01 flicker 34 sec, Leia display
         case 9 : { m_soundDisco();        break; }  // Disco          - disco sound, spectrum display, RLD displays "Star Wars", hp flicker indefinitely,
         case 10 : { m_soundStop();        break; }  // Quiet mode (stop sound)
@@ -1000,10 +965,12 @@ void Marcduino::quietMode(void)       { m_runSequence(10); }
 void Marcduino::m_fullAwakeMode(void) { m_runSequence(11); }
 void Marcduino::m_midAwakeMode(void)  { m_runSequence(13); }
 void Marcduino::m_awakePlusMode(void) { m_runSequence(14); }
+void Marcduino::m_cantinaBeep(void)   { m_runSequence(5); }
 void Marcduino::m_cantinaDance(void)  { m_runSequence(7); }
 void Marcduino::m_disco(void)         { m_runSequence(9); }
 void Marcduino::m_faint(void)         { m_runSequence(6); }
 void Marcduino::m_fastWave(void)      { m_runSequence(3); }
+void Marcduino::m_marchingAnts(void)  { m_runSequence(55); }
 void Marcduino::m_leiaMessage(void)   { m_runSequence(8); }
 void Marcduino::m_scream(void)        { m_runSequence(1); }
 void Marcduino::m_wave(void)          { m_runSequence(2); }

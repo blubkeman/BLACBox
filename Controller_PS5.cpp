@@ -2,11 +2,10 @@
  *    B.L.A.C.Box: Brian Lubkeman's Astromech Controller
  * =================================================================================
  * Controller_PS5.cpp - Library for supported controllers
- * Created by Brian Lubkeman, 5 May 2021
+ * Created by Brian Lubkeman, 10 May 2021
  * Inspired by S.H.A.D.O.W. controller code written by KnightShade
  * Released into the public domain.
  */
-#include <Arduino.h>
 #include "Controller.h"
 
 /* ================================================================================
@@ -16,13 +15,11 @@
 // =====================
 //      Constructor
 // =====================
-Controller_PS5::Controller_PS5(int settings[])
-  : Controller(settings),
+Controller_PS5::Controller_PS5(const int settings[], const unsigned long timings[])
+  : Controller(settings, timings),
     m_controller(&m_Btd)
 {
-  #if defined(DEBUG)
-  m_className = "Controller_PS5::";
-  #endif
+  m_type = 3; // 0=PS3Nav, 1=PS3, 2=PS4, 3=PS5
 }
 
 // ====================
@@ -48,22 +45,12 @@ void Controller_PS5::begin(void)
   anchor = this;
   m_controller.attachOnInit(m_onInit);
 
-  // ----------
-  // Debugging.
-  // ----------
-
   #if defined(DEBUG)
-  output = m_className+F("begin()");
-  output += F(" - ");
-  output += F("Ready to connect a");
-  output += F(" PS5");
-  output += F(" controller");
-
-  output += F("\n  Drive stick:   ");
-  driveStick.displayInit();
-  output += F("\n  Dome stick:    ");
-  domeStick.displayInit();
-  printOutput();
+  Debug.print(DBG_INFO, F("Controller_PS5"), F("m_onInitConnect()"), F("Ready to connect a PS5 controller"));
+  Debug.print(DBG_VERBOSE, F("\n  Drive stick: "), (String)driveStick.getSide());
+  Debug.print(DBG_VERBOSE, F("\n    Dead zone: "), (String)driveStick.deadZone);
+  Debug.print(DBG_VERBOSE, F("\n   Dome stick: "), (String)domeStick.getSide());
+  Debug.print(DBG_VERBOSE, F("\n    Dead zone: "), (String)domeStick.deadZone);
   #endif
 }
 
@@ -89,11 +76,7 @@ void Controller_PS5::m_connect(void)
   if ( ! connected() ) {
 
     #if defined(DEBUG)
-    output = m_className+F("m_connect()");
-    output += F(" - ");
-    output += F("Controller");
-    output += F(" invalid");
-    printOutput();
+    Debug.print(DBG_WARNING, F("Controller_PS5"), F("m_connect()"), F("Controller invalid"));
     #endif
 
     m_disconnect();
@@ -116,17 +99,9 @@ void Controller_PS5::m_connect(void)
 
   m_setConnectionStatus(FULL);
 
-  // ----------
-  // Debugging.
-  // ----------
-
   #if defined(DEBUG)
   if ( connectionStatus() > NONE ) {
-    output = m_className+F("m_connect()");
-    output += F(" - ");
-    output += F("Controller");
-    output += F(" connected");
-    printOutput();
+    Debug.print(DBG_INFO, F("Controller_PS5"), F("m_connect()"), F("Controller connected"));
   }
   #endif
 }
@@ -141,10 +116,7 @@ void Controller_PS5::m_disconnect(void)
   m_setConnectionStatus(NONE);
 
   #if defined(DEBUG)
-  output = m_className+F("m_disconnect()");
-  output += F(" - ");
-  output += F("Controller disconnected");
-  printOutput();
+  Debug.print(DBG_INFO, F("Controller_PS5"), F("m_disconnect()"), F("Controller disconnected"));
   #endif
 }
 
@@ -175,10 +147,7 @@ void Controller_PS5::setLed(bool driveEnabled, byte speedProfile)
       }
       default: {
         #if defined(DEBUG)
-        output = m_className+F("setLed()");
-        output += F(" - ");
-        output += F("Speed profile unknown");
-        printOutput();
+        Debug.print(DBG_WARNING, F("Controller_PS5"), F("setLed()"), F("Speed profile unknown"));
         #endif
       }
     }
@@ -223,11 +192,7 @@ bool Controller_PS5::read()
   if ( button.clicked(PS) && ( button.pressed(L2) || button.pressed(R2) ) ) {
 
     #if defined(DEBUG)
-    output = F("\n");
-    output += m_className+F("read()");
-    output += F(" - ");
-    output += F("Disconnecting due to user request");
-    printOutput();
+    Debug.print(DBG_INFO, F("Controller_PS5"), F("read()"), F("Disconnecting due to user request"));
     #endif
 
     m_disconnect();

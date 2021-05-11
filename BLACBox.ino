@@ -1,7 +1,7 @@
 /* =================================================================================
  *    B.L.A.C.Box: Brian Lubkeman's Astromech Controller
  * =================================================================================
- *                          Last Revised Date: 5 May 2021
+ *                          Last Revised Date: 10 May 2021
  *                          Revised By: Brian E. Lubkeman
  *  Inspired by the PADAWAN (danf), SHADOW (KnightShade), SHADOW_MD (vint43) effort
  * =================================================================================
@@ -35,17 +35,18 @@
  *   7.  Achieved - Support drive motor control using Roboteq SBL2360 (without mixing).
  *   8.  Achieved - Support dome motor control using a Syren 10.
  *   9   Testing  - Support radio communication with dome electroncis instead of a slip ring.
- *   10. Future   - Support drive motor control using Roboteq SBL1360 (with mixing).
- *   11. Future   - Support drive motor control using Sabertooth.
- *   12. Future   - Support I2C-based peripherals to replace Marcduino body master.
+ *   10. Testing  - Support drive motor control using Sabertooth.
+ *   11. Future   - Support drive motor control using Roboteq SBL1360 (with mixing).
+ *   12. Future   - Support I2C-based FX system to replace Marcduino body master.
  *
  * =======================================================================================
- * 
+ *
  * This rewrite was developed and tested on the following equipment.
  *   Arduino Mega 2560                (https://www.sparkfun.com/products/11061)
  *   Sainsmart USB host shield        (https://www.amazon.com/gp/product/B006J4G000)
  *   TRENDNet USB bluetooth dongle    (https://www.amazon.com/gp/product/B002AQSTXM)
  *   PS3 Move Navigation controller   (used, from www.gamestop.com)
+ *   PS3 controller                   (used, from www.gamestop.com)
  *   PS4 controller                   (new, from www.gamestop.com)
  *   Compact Marcduino v1.5           (https://astromech.net/forums/showthread.php?30724-Compact-Marcduino-v1-5-BC-Approved-Continuous-Various-(Jan-2017)-Open)
  *   Sparkfun MP3 Trigger             (https://www.sparkfun.com/products/13720)
@@ -57,8 +58,25 @@
  *   Sabertooth motor controller      (https://www.dimensionengineering.com/products/sabertooth2x25)
  *   Sparkfun Qwiic MP3 Trigger       (https://www.sparkfun.com/products/15165)
  *   Adafruit I2C PWM driver          (https://www.adafruit.com/product/815)
+ *
+ * =======================================================================================
+ * 
+ * The hardest part of getting this code to work with a Roboteq motor driver was understanding
+ * the conversions from analog input to Roboteq Pulse inputs. The secret came when reading the
+ * Servo.h library. It quietly converts degrees into milliseconds. Once I found this, it was
+ * easy to understand the Pulse inputs that were needed. Here are the conversions that take
+ * place along the way.
+ * 
+ * Analog Input   Converted   Converted to  |  Roboteq Pulse
+ * from joystick  to degrees  milliseconds  |  Input Ranges
+ * -------------  ----------  ------------  |  -------------
+ * Min = 0        Min = 0     Min = 544     |  Min = 544
+ * Mid = 127      Mid = 90    Mid = 1472    |  Mid = 1472
+ * Max = 255      Max = 180   Max = 2400    |  Max = 2400
+ * 
  */
 #include "Settings.h"
+#include "DebugUtils.h"
 /*
 #include "src/Controller/Controller.h"
 #include "src/DomeMotor/DomeMotor.h"
@@ -70,30 +88,31 @@
 #include "DriveMotor.h"
 #include "Marcduino.h"
 
-Controller_PS4 controller(controllerSettings);
-Controller_PS4* Controller_PS4::anchor = { NULL };
-/*
-Controller_PS3Nav controller(controllerSettings);
+#if defined(PS3_NAVIGATION)
+Controller_PS3Nav controller(controllerSettings, controllerTimings);
 Controller_PS3Nav* Controller_PS3Nav::anchor = { NULL };
-Controller_PS3 controller(controllerSettings);
+#elif defined(PS3_CONTROLLER)
+Controller_PS3 controller(controllerSettings, controllerTimings);
 Controller_PS3* Controller_PS3::anchor = { NULL };
-Controller_PS5 controller(controllerSettings);
+#elif defined(PS4_CONTROLLER)
+Controller_PS4 controller(controllerSettings, controllerTimings);
+Controller_PS4* Controller_PS4::anchor = { NULL };
+#elif defined(PS5_CONTROLLER)
+Controller_PS5 controller(controllerSettings, controllerTimings);
 Controller_PS5* Controller_PS5::anchor = { NULL };
-*/
+#endif
 
 DomeMotor_Syren10 domeMotor(&controller, domeMotorSettings, domeMotorTimings, syrenSettings);
-HardwareSerial &DomeMotorSerial = Serial2;
-
-DriveMotor_Roboteq driveMotor(&controller, driveMotorSettings, driveMotorPins);
-HardwareSerial &DriveSerial = Serial1;
-
+DriveMotor_Roboteq driveMotor(&controller, driveMotorSettings, driveMotorPins, roboteqSettings);
 Marcduino marcduino(&controller, marcduinoSettings);
-HardwareSerial &MD_Body_Serial = Serial3;
-HardwareSerial &MD_Dome_Serial = Serial1;
 
-#if defined(DEBUG) || defined(TEST_CONTROLLER)
-String output;
-#endif
+// Rearrange the Serial configurations to fit your electronics.
+
+HardwareSerial &MD_Body_Serial    = Serial3;
+HardwareSerial &DomeMotor_Serial  = Serial2;
+HardwareSerial &DriveMotor_Serial = Serial2;
+HardwareSerial &MD_Dome_Serial    = Serial1;
+
 
 /* ============================================================
  *                   M A I N   P R O G R A M
@@ -106,19 +125,17 @@ void setup() {
   // -------------------------
 
   #if defined(DEBUG) || defined(TEST_CONTROLLER)
-  output.reserve(200);
   Serial.begin(115200);
   #if !defined(__MIPSEL__)
   while (!Serial);
   #endif
+
+  Debug.setDebugLevel(DBG_VERBOSE);
+  Debug.print(DBG_INFO, F("============================================="));
   #endif
 
   #if defined(DEBUG)
-  output = F("\n=============================================");
-  output += F("\n");
-  output += F("setup()");
-  output += F(" - Starting");
-  printOutput();
+  Debug.print(DBG_INFO, F("BLACBox"), F("setup()"), F("Starting"));
   #endif
 
   // ---------------------
@@ -140,11 +157,12 @@ void setup() {
   // --------------
 
   #if defined(DEBUG)
-  output = F("setup()");
-  output += F(" - Complete");
-  output += F("\n=============================================");
-  printOutput();
+  Debug.print(DBG_INFO, F("BLACBox"), F("setup()"), F("Complete"));
   #endif
+
+  #if defined(DEBUG) || defined(TEST_CONTROLLER)
+  Debug.print(DBG_INFO, F("============================================="));
+  #endif  
 }
 
 void loop() {
@@ -154,8 +172,8 @@ void loop() {
    * ======================== */
   if ( controller.isDisconnecting() ) {
     // Stop the drive motors when we lose the controller.
-    Serial.println(F("Disconnecting drive."));
     driveMotor.stop();
+    Serial.println(F("Disconnected drive."));
     controller.disconnecting();
   } else if ( controller.read() ) {
     driveMotor.interpretController();
@@ -166,13 +184,13 @@ void loop() {
    * ======================= */
   if ( controller.isDisconnecting() ) {
     // Stop the dome motor when we lose the controller.
-    Serial.println(F("Disconnecting dome."));
     domeMotor.stop();
+    Serial.println(F("Disconnected dome."));
     controller.disconnecting();
   } else if ( controller.read() ) {
     domeMotor.interpretController();
     if ( domeMotor.isAutomationRunning() ) {
-      domeMotor.runHoloAutomation();
+      domeMotor.runAutomation();
     }
   }
 
@@ -181,46 +199,14 @@ void loop() {
    * =========================== */
   if ( controller.isDisconnecting() ) {
     // Put Marcduino into Quiet mode when we lose the controller.
-    Serial.println(F("Disconnecting Marcduino."));
     marcduino.quietMode();
+    Serial.println(F("Disconnected Marcduino."));
     controller.disconnecting();
   } else if ( controller.read() ) {
     marcduino.interpretController();
     if ( marcduino.isCustomPanelRunning() ) {
       marcduino.runCustomPanelRoutine();
     }
-    marcduino.runHoloAutomation();
+    marcduino.runAutomation();
   }
 }
-
-
-/* ===================================================
- *           Support variables and functions
- * =================================================== */
-
-// ===========================
-//      getPgmString()
-// ===========================
-String getPgmString(const char * inValue)
-{
-  // This function takes in a pointer to a char array that has been
-  // stored in program memory and returns its string content.
-
-  String outValue = "";
-  for (byte k = 0; k < strlen_P(inValue); k++) {
-    outValue += (char)pgm_read_byte_near(inValue + k);
-  }
-  return outValue;
-}
-
-#if defined(DEBUG) || defined(TEST_CONTROLLER)
-// =======================
-//      printOutput()
-// =======================
-void printOutput(void) {
-  if ( output != "" ) {
-    if (Serial) Serial.println(output);
-    output = "";
-  }
-}
-#endif
