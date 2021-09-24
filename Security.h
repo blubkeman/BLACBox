@@ -33,10 +33,10 @@
 
 // =================================================================
 
-const char ps3nav_addr1[] PROGMEM = "00:06:F7:B8:57:01";
-const char ps3nav_addr2[] PROGMEM = "E0:AE:5E:38:E0:CD";
-const char ps3_addr1[]    PROGMEM = "38:C0:96:DD:15:DD";
-const char ps4_addr1[]    PROGMEM = "4C:B9:9B:21:63:3E";
+const char ps3nav_addr1[] PROGMEM = "xx:xx:xx:xx:xx:xx";
+const char ps3nav_addr2[] PROGMEM = "yy:yy:yy:yy:yy:yy";
+const char ps3_addr1[]    PROGMEM = "zz:zz:zz:zz:zz:zz";
+const char ps4_addr1[]    PROGMEM = "aa:aa:aa:aa:aa:aa";
 
 const char * authorizedMACAddresses[] = {
   ps3nav_addr1,
