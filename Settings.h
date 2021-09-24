@@ -2,7 +2,7 @@
  *    B.L.A.C.Box: Brian Lubkeman's Astromech Controller
  * =================================================================================
  * Settings.h - Library for user settings
- * Created by Brian Lubkeman, 10 May 2021
+ * Created by Brian Lubkeman, 16 June 2021
  * Inspired by S.H.A.D.O.W. controller code written by KnightShade
  * Released into the public domain.
  */
@@ -22,11 +22,6 @@
 #define PS4_CONTROLLER
 //#define PS5_CONTROLLER
 
-// Uncomment the following to enable additional debugging details that can
-// help with pairing a controller.
-
-#define ENABLE_UHS_DEBUGGING 1
-
 const int controllerSettings[] = {
    0      // Drive stick side.       : Set to 0=left, or 1=right.
  , 1      // Dome stick side         : Set to 0=left, or 1=right (opposite of the drive stick side).
@@ -42,13 +37,23 @@ const unsigned long controllerTimings[] = {
  , 100    // Plugged long interval   : Set to a time in milliseconds. Part of critical fault detection.
 };
 
+
+// PS4 Pairing instructions:
+// Set the following constant to true.  Upload the sketch.  Open the serial monitor.
+// You should see "Please enable discovery of your device".  Press SHARE then press PS.
+// Pairing should be complete.  Reset the constant to false.  Upload the sketch.  Press PS.
+
+#if defined(PS4_CONTROLLER) || defined(PS5_CONTROLLER)
+const bool pair = false;       // Perform controller pairing
+#endif
+
 // ========================================
 //           Drive System Settings
 // ========================================
 
 const int driveMotorSettings[] = {
    0      // Motor driver            : Set to 0=Roboteq SBL2360 or SBL1360, 1=Sabertooth (not yet supported).
- , 1      // Use dead man switch     : Set to 0=false, 1=true.
+ , 0      // Use dead man switch     : Set to 0=false, 1=true.
  , 25     // Serial latency (in ms)  : Set to 25 ms for HardwareSerial, 50+ ms for SoftwareSerial.
  , 7      // Servo dead zone         : Similar to joystick dead zone, but for the servo value range.
 };

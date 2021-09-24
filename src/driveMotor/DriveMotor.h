@@ -2,7 +2,7 @@
  *    B.L.A.C.Box: Brian Lubkeman's Astromech Controller
  * =================================================================================
  * DriveMotor.h - Library for supported drive motor controllers
- * Created by Brian Lubkeman, 10 May 2021
+ * Created by Brian Lubkeman, 16 June 2021
  * Inspired by S.H.A.D.O.W. controller code written by KnightShade
  * Released into the public domain.
  */
@@ -10,9 +10,8 @@
 #define __BLACBOX_DRIVE_MOTOR_H__
 
 #include <Servo.h>
-//#include "../Controller/Controller.h"
-#include "Controller.h"
-#include "DebugUtils.h"
+#include "../toolbox/DebugUtils.h"
+#include "../controller/Controller.h"
 
 #define DEBUG
 

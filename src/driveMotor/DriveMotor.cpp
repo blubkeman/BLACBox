@@ -2,7 +2,7 @@
  *    B.L.A.C.Box: Brian Lubkeman's Astromech Controller
  * =================================================================================
  * DriveMotor.cpp - Library for supported drive motor controllers
- * Created by Brian Lubkeman, 10 May 2021
+ * Created by Brian Lubkeman, 16 June 2021
  * Inspired by S.H.A.D.O.W. controller code written by KnightShade
  * Released into the public domain.
  */
@@ -97,18 +97,39 @@ void DriveMotor::interpretController(void)
     m_controller->setLed(driveEnabled, speedProfile);
   }
 
-  // ---------------------------------------
-  // Look for a change in the speed profile.
-  // ---------------------------------------
+  // ----------------------------------------------------
+  // When pressing L1|R1, do not read the joystick as we
+  // anticipate L3|R3 being pressed. When L1+L3|R+R3 _is_
+  // pressed, look for a change in the speed profile.
+  // ----------------------------------------------------
 
-  if ( (m_driveStick->side == left && m_button->pressed(L1) && m_button->clicked(L3)) ||
-       (m_driveStick->side == right && m_button->pressed(R1) && m_button->clicked(R3)) ) {
-    m_setSpeedProfile();
+  switch (m_driveStick->side) {
+
+  	case left:
+  	  if ( m_button->pressed(L1) ) {
+  	    if ( m_button->clicked(L3) ) {
+  	      m_setSpeedProfile();
+  	    }
+  	    return;
+  	  }
+  	  break;
+
+  	case right:
+  	  if ( m_button->pressed(R1) ) {
+  	    if ( m_button->clicked(R3) ) {
+  	      m_setSpeedProfile();
+  	    }
+  	    return;
+  	  }
+  	  break;
+
+  	default:
+  	  break;
   }
 
-  // -----------------------------------
-  // Look for disabling the drive stick.
-  // -----------------------------------
+  // --------------------------------------------
+  // Look for enabling/disabling the drive stick.
+  // --------------------------------------------
 
   if ( m_button->pressed(PS) || m_button->pressed(PS2) ) {
 
@@ -133,25 +154,33 @@ void DriveMotor::interpretController(void)
     }
   }
 
-  // --------------------------------------------------
-  // Stop the mootors when the drive stick is disabled.
-  // --------------------------------------------------
+  // -------------------------------------------------
+  // Stop the motors when the drive stick is disabled.
+  // -------------------------------------------------
 
   if ( ! driveEnabled ) {
+
+    #if defined(DEBUG)
+    Debug.print(DBG_VERBOSE, F("DriveMotor"), F("interpretController"), F("Stop due to disabled stick."));
+    #endif
+
     stop();
     return;
   }
 
-  #if defined(DEADMAN)
   // ----------------------------------------------------------------
   // Stop the motors when a deadman switch is in use but not pressed.
   // ----------------------------------------------------------------
 
-  if ( ! m_isDeadmanPressed() ) {
+  if ( m_settings[iDeadMan] && ! m_isDeadmanPressed() ) {
+
+    #if defined(DEBUG)
+    Debug.print(DBG_VERBOSE, F("DriveMotor"), F("interpretController"), F("Stop due to deadman switch."));
+    #endif
+
     stop();
     return;
   }
-  #endif
 
   // ------------------------------------------------------------------------
   // Flood control. Don't overload the motor controller with excessive input.
@@ -162,16 +191,6 @@ void DriveMotor::interpretController(void)
     return;
   }
   m_previousTime = currentTime;
-
-  // -------------------------------------------------------
-  // When pressing L1|R1, we anticipate L3|R3 to be pressed.
-  // Skip reading the joystick in this case.
-  // -------------------------------------------------------
-
-  if ( (m_driveStick->side == left && m_button->pressed(L1)) ||
-       (m_driveStick->side == right && m_button->pressed(R1)) ) {
-    return;
-  }
 
   // ---------------------------------------------------------------
   // Get the drive joystick steering (X) and throttle (Y) positions.
@@ -201,6 +220,7 @@ void DriveMotor::interpretController(void)
   } else {
     m_drive();
   }
+
 }
 
 // ================================

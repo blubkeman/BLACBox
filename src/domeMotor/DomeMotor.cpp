@@ -2,7 +2,7 @@
  *    B.L.A.C.Box: Brian Lubkeman's Astromech Controller
  * =================================================================================
  * DomeMotor.cpp - Library for supported dome motor controllers
- * Created by Brian Lubkeman, 10 May 2021
+ * Created by Brian Lubkeman, 16 June 2021
  * Inspired by S.H.A.D.O.W. controller code written by KnightShade
  * Released into the public domain.
  */

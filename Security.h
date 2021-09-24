@@ -2,7 +2,7 @@
  *    B.L.A.C.Box: Brian Lubkeman's Astromech Controller
  * =================================================================================
  * Security.h - A list of authorized MAC addresses for the user's controllers
- * Created by Brian Lubkeman, 10 May 2021
+ * Created by Brian Lubkeman, 16 June 2021
  * Inspired by S.H.A.D.O.W. controller code written by KnightShade
  * Released into the public domain.
  * =================================================================================
@@ -34,9 +34,9 @@
 // =================================================================
 
 const char ps3nav_addr1[] PROGMEM = "xx:xx:xx:xx:xx:xx";
-const char ps3nav_addr2[] PROGMEM = "xx:xx:xx:xx:xx:xx";
-const char ps3_addr1[]    PROGMEM = "xx:xx:xx:xx:xx:xx";
-const char ps4_addr1[]    PROGMEM = "xx:xx:xx:xx:xx:xx";
+const char ps3nav_addr2[] PROGMEM = "yy:yy:yy:yy:yy:yy";
+const char ps3_addr1[]    PROGMEM = "zz:zz:zz:zz:zz:zz";
+const char ps4_addr1[]    PROGMEM = "aa:aa:aa:aa:aa:aa";
 
 const char * authorizedMACAddresses[] = {
   ps3nav_addr1,

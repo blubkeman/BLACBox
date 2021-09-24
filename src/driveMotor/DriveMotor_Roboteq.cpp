@@ -2,7 +2,7 @@
  *    B.L.A.C.Box: Brian Lubkeman's Astromech Controller
  * =================================================================================
  * DriveMotor_Roboteq.cpp - Library for the Roboteq SBL2360 or SBL1360 drive motor controller
- * Created by Brian Lubkeman, 10 May 2021
+ * Created by Brian Lubkeman, 16 June 2021
  * Inspired by S.H.A.D.O.W. controller code written by KnightShade
  * Released into the public domain.
  */
@@ -144,53 +144,35 @@ void DriveMotor_Roboteq::m_drive(void)
   // Get the inputs based on the throttle and steering values from the joystick.
   // ---------------------------------------------------------------------------
 
-  if ( m_settings[iMixing] == byDriver ) {
+  if ( m_roboteqSettings[iMixing] == byDriver ) {
 
     // Mixing is done by the motor driver.
 
-    m_analogToServo(m_steering, m_throttle);
+    m_analogToServo(m_throttle, m_steering);
 
+  	#if defined(DEBUG)
+  	String msg = (String)m_input1;
+  	msg += F("/");
+  	msg += (String)m_input2;
+  	msg += F(" (");
+  	msg += (String)(544 + round(m_input1 * 10.311));
+  	msg += F("/");
+  	msg += (String)(544 + round(m_input2 * 10.311));
+  	msg += F(")");
+  	char buff[22];
+  	msg.toCharArray(buff, 22);
+  	Debug.print(DBG_VERBOSE, F("DriveMotor_Roboteq"), F("m_drive()"), F("Throttle/Steering: "), (String)buff);
+  	#endif
+	
   } else if ( m_roboteqSettings[iMixing] == bySketch ) {
 
     // Mixing is handled by this sketch.
 
-    m_mixBHD(m_steering, m_throttle);
+    m_mixBHD(m_throttle, m_steering);
 
   } else {
 
     // Unknown mixing setting.
-
-    return;
-  }
-
-  // -----------------------------------
-  // Do nothing when there is no change.
-  // -----------------------------------
-
-  if ( m_previousInput1 == m_input1 && m_previousInput2 == m_input2 ) {
-    return;
-  }
-
-  // -------------------------------
-  // Send the values to the Roboteq.
-  // -------------------------------
-
-  if ( m_settings[iCommMode] == Pulse ) {
-
-    // Pulse mode
-
-    m_writePulse(m_input1, m_input2);
-  } else if ( m_settings[iCommMode] == RS232 ) {
-
-    // RS232 (Serial) mode
-
-    char cmd[22];
-    sprintf(cmd, "!G 1 %i_!G 2 %i\\r", m_input1, m_input2);
-    m_writeSerial(cmd);
-
-  } else {
-
-    // Unknown communication type setting.
 
     return;
   }
@@ -201,11 +183,28 @@ void DriveMotor_Roboteq::m_drive(void)
 
   driveStopped = false;
 
-  #if defined(DEBUG)
-  char buff[22];
-  sprintf(buff, "%i/%i (%i/%i ms)", m_input1, m_input2, (544 + round(m_input1 * 10.311)), (544 + round(m_input2 * 10.311)));
-  Debug.print(DBG_VERBOSE, F("DriveMotor_Roboteq"), F("m_drive()"), F("Throttle/Steering: "), (String)buff);
-  #endif
+  // -------------------------------
+  // Send the values to the Roboteq.
+  // -------------------------------
+
+  switch (m_settings[iCommMode]) {
+
+    case Pulse:
+      // Pulse mode
+      m_writePulse(m_input1, m_input2);
+      break;
+
+    case RS232:
+      // RS232 (Serial) mode
+      char cmd[22];
+      sprintf(cmd, "!G 1 %i_!G 2 %i\\r", m_input1, m_input2);
+      m_writeSerial(cmd);
+      break;
+
+    default:
+      // Unknown communication type setting.
+      return;
+  }
 
   // ----------------------------
   // Remember the stick position.
@@ -218,14 +217,13 @@ void DriveMotor_Roboteq::m_drive(void)
 // ===========================
 //      m_analogToServo()
 // ===========================
-void DriveMotor_Roboteq::m_analogToServo(int steering, int throttle)
+void DriveMotor_Roboteq::m_analogToServo(int throttle, int steering)
 {
   // ----------------------------------------------------------------------
   // Map the joystick into the servo value range of 0 to 180 degrees.
-  // Invert the throttle signal so that forward is high and reverse is low.
   // ----------------------------------------------------------------------
 
-  m_input1 = map(throttle, m_driveStick->minValue, m_driveStick->maxValue, m_servoMax, m_servoMin);
+  m_input1 = map(throttle, m_driveStick->minValue, m_driveStick->maxValue, m_servoMin, m_servoMax);
   m_input2 = map(steering, m_driveStick->minValue, m_driveStick->maxValue, m_servoMin, m_servoMax);
 
   // ----------------------------------------------------------------------
@@ -245,8 +243,14 @@ void DriveMotor_Roboteq::m_analogToServo(int steering, int throttle)
 // ========================
 void DriveMotor_Roboteq::m_writePulse(int input1, int input2)
 {
-  m_pulse1Signal.write(input1);
-  m_pulse2Signal.write(input2);
+  // Our input is in degrees (0-180), however the m_pulseXSignal variables
+  // are Servo objects. That class converts degrees to milliseconds when
+  // writing its data out. Thus the output value to the Roboteq is in the
+  // range 544-2400 with 1472 as center.
+
+  m_pulse1Signal.write(input1);		// throttle (2360) or left foot (1360)
+  m_pulse2Signal.write(input2);		// steering (2360) or right foot (1360)
+
 }
 void DriveMotor_Roboteq::m_writePulse(int input)
 {
@@ -258,24 +262,31 @@ void DriveMotor_Roboteq::m_writePulse(int input)
 // ===============================
 void DriveMotor_Roboteq::m_writeScript(void)
 {
-  m_scriptSignal.write(speedProfile);
+
+  int output = 45 + (speedProfile * 45);	// yields: WALK = 45, JOG = 90, RUN = 135, SPRINT = 180;
+
+  #if defined(DEBUG)
+  Debug.print(DBG_VERBOSE, F("DriveMotor_Roboteq"), F("m_writeScript()"), F("Speed profile: "), (String)output);
+  #endif
+
+  m_scriptSignal.write(output);
 }
 
 
 // ====================
 //      m_mixBHD()
 // ====================
-void DriveMotor_Roboteq::m_mixBHD(byte stickX, byte stickY) {
+void DriveMotor_Roboteq::m_mixBHD(byte throttle, byte steering) {
 /* =============================================================
  *  This is my interpretation of BigHappyDude's mixing function for differential (tank) style driving using two motors.  
- *  We will take the joystick's X and Y positions, mix these into a diamond matrix, and convert to a servo value range 
- *   (0-180) for the left and right foot motors.
+ *  We will take the joystick's X (steering) and Y (throttle) positions, mix these into a diamond matrix, and convert
+ *   to a servo value range (0-180) for the left and right foot motors.
  *  The maximum drive speed BHD used is excluded in this version as that is handled through a script in the Roboteq.
  *  If you wish to understand how this works, please see the comments in the mixBHD function implemented into the
  *   SHADOW_MD_Q85 code.
  * ============================================================= */
 
-  if ( stickX == m_driveStick->center && stickY == m_driveStick->center ) {
+  if ( steering == m_driveStick->center && throttle == m_driveStick->center ) {
 
     m_input1=m_servoCenter;
     m_input2=m_servoCenter;
@@ -286,16 +297,16 @@ void DriveMotor_Roboteq::m_mixBHD(byte stickX, byte stickY) {
   int xInt = 0;
   int yInt = 0;
 
-  if (stickY < m_driveStick->center) {
-    yInt = map(stickY, m_driveStick->minValue, (m_driveStick->center - m_driveStick->deadZone), 100, 1);
+  if (throttle < m_driveStick->center) {
+    yInt = map(throttle, m_driveStick->minValue, (m_driveStick->center - m_driveStick->deadZone), 100, 1);
   } else {
-    yInt = map(stickY, (m_driveStick->center + m_driveStick->deadZone), m_driveStick->maxValue, -1, -100);
+    yInt = map(throttle, (m_driveStick->center + m_driveStick->deadZone), m_driveStick->maxValue, -1, -100);
   }
 
-  if (stickX < m_driveStick->center) {
-    xInt = map(stickX, m_driveStick->minValue, (m_driveStick->center - m_driveStick->deadZone), -100, -1);
+  if (steering < m_driveStick->center) {
+    xInt = map(steering, m_driveStick->minValue, (m_driveStick->center - m_driveStick->deadZone), -100, -1);
   } else {
-    xInt = map(stickX, (m_driveStick->center + m_driveStick->deadZone), m_driveStick->maxValue, 1, 100);
+    xInt = map(steering, (m_driveStick->center + m_driveStick->deadZone), m_driveStick->maxValue, 1, 100);
   }
 
   float xFloat = xInt;

@@ -2,7 +2,7 @@
  *    B.L.A.C.Box: Brian Lubkeman's Astromech Controller
  * =================================================================================
  * Peripheral_Marcduino.cpp - Library for the Marcduino system
- * Created by Brian Lubkeman, 10 May 2021
+ * Created by Brian Lubkeman, 16 June 2021
  * Inspired by S.H.A.D.O.W. controller code written by KnightShade
  * Released into the public domain.
  */
@@ -43,6 +43,14 @@ void Marcduino::begin()
   if ( m_settings[iBodyMaster] ) {
     MD_Body_Serial.begin(MARCDUINO_BAUD_RATE);
   }
+
+  #if defined(DEBUG)
+  if ( m_settings[iCmdSet] == 0 ) {
+    Debug.print(DBG_VERBOSE, F("Marcduino"), F("begin()"), F("Using SHADOW+MD command set"));
+  } else if ( m_settings[iCmdSet] == 1 ) {
+    Debug.print(DBG_VERBOSE, F("Marcduino"), F("begin()"), F("Using custom command set"));
+  }
+  #endif
 }
 
 // ===============================
@@ -76,12 +84,6 @@ void Marcduino::interpretController(void)
   if ( m_settings[iCmdSet] == 0 ) {
 
     // These mappings should mimic the SHADOW+MD controls.
-
-    #if defined(DEBUG)
-    if ( m_buttonIndex > -1 ) {
-      Debug.print(DBG_VERBOSE, F("Marcduino"), F("interpretController()"), F("SHADOW+MD command set"));
-    }
-    #endif
 
     switch (m_buttonIndex) {
       case 0 :  { quietMode();         break; } // UP
@@ -143,20 +145,15 @@ void Marcduino::interpretController(void)
 
     // This is where you may define your own button combo mappings.
 
-    #if defined(DEBUG)
-    if ( m_buttonIndex > -1 ) {
-      Debug.print(DBG_VERBOSE, F("Marcduino"), F("interpretController()"), F("Custom command set"));
-    }
-    #endif
     switch (m_buttonIndex) {
       case 0 :  { quietMode();             break; } // UP
       case 1 :  { m_midAwakeMode();        break; } // RIGHT
       case 2 :  { m_fullAwakeMode();       break; } // DOWN
       case 3 :  { m_awakePlusMode();       break; } // LEFT
-      case 4 :  { break; } // TRIANGLE
-      case 5 :  { break; } // CIRCLE
-      case 6 :  { break; } // CROSS
-      case 7 :  { break; } // SQUARE
+      case 4 :  {                          break; } // TRIANGLE
+      case 5 :  {                          break; } // CIRCLE
+      case 6 :  {                          break; } // CROSS
+      case 7 :  {                          break; } // SQUARE
       case 8 :  { m_volumeUp();            break; } // L1/R1 + UP
       case 9 :  { m_hpReset(0);            break; } // L1/R1 + RIGHT
       case 10 : { m_volumeDown();          break; } // L1/R1 + DOWN
@@ -185,10 +182,10 @@ void Marcduino::interpretController(void)
       case 33 : { m_bodyPanelClose(2);     break; } // PS/PS2 + RIGHT
       case 34 : { m_bodyPanelClose(1);     break; } // PS/PS2 + DOWN
       case 35 : { m_bodyPanelOpen(2);      break; } // PS/PS2 + LEFT
-      case 36 : { break; } // PS/PS2 + TRIANGLE
-      case 37 : { break; } // PS/PS2 + CIRCLE
-      case 38 : { break; } // PS/PS2 + CROSS
-      case 39 : { break; } // PS/PS2 + SQUARE
+      case 36 : {                          break; } // PS/PS2 + TRIANGLE
+      case 37 : {                          break; } // PS/PS2 + CIRCLE
+      case 38 : {                          break; } // PS/PS2 + CROSS
+      case 39 : {                          break; } // PS/PS2 + SQUARE
       default : { break; }
     }
 
@@ -283,7 +280,6 @@ void Marcduino::m_sendCommand(String inStr, HardwareSerial* targetSerial)
   //  or a Feather Radio (wireless) connection to the dome.
   // --------------------------------------------------------------
 
-  char buff[50];
   if ( m_settings[iRadio] ) {
   
     if ( targetSerial == &MD_Dome_Serial ) {
@@ -294,7 +290,9 @@ void Marcduino::m_sendCommand(String inStr, HardwareSerial* targetSerial)
       }
 
       #if defined(DEBUG)
-      sprintf(buff, "%s to dome via Feather Radio", inStr);
+      String msg = inStr + F(" to dome via Feather Radio");
+      char buff[50];
+      msg.toCharArray(buff, 50);
       Debug.print(DBG_INFO, F("Marcduino"), F("m_sendCommand()"), buff);
       #endif
   
@@ -305,11 +303,14 @@ void Marcduino::m_sendCommand(String inStr, HardwareSerial* targetSerial)
   targetSerial->print(inStr);
 
   #if defined(DEBUG)
+  String msg = inStr;
   if ( targetSerial == &MD_Dome_Serial ) {
-    sprintf(buff, "%s to dome via Serial", inStr);
+    msg += F(" to dome via Serial");
   } else if ( targetSerial == &MD_Body_Serial ) {
-    sprintf(buff, "%s to body via Serial", inStr);
+    msg += F(" to body via Serial");
   }
+  char buff[50];
+  msg.toCharArray(buff, 50);
   Debug.print(DBG_INFO, F("Marcduino"), F("m_sendCommand()"), buff);
   #endif
 }

@@ -2,13 +2,12 @@
  *    B.L.A.C.Box: Brian Lubkeman's Astromech Controller
  * =================================================================================
  * Controller.cpp - Library for supported controllers
- * Created by Brian Lubkeman, 10 May 2021
+ * Created by Brian Lubkeman, 16 June 2021
  * Inspired by S.H.A.D.O.W. controller code written by KnightShade
  * Released into the public domain.
  */
 #include "Controller.h"
-//#include "../../Security.h"
-#include "Security.h"
+#include "../../Security.h"
 
 /* ================================================================================
  *                             Parent Controller Class

@@ -2,7 +2,7 @@
  *    B.L.A.C.Box: Brian Lubkeman's Astromech Controller
  * =================================================================================
  * Controller.h - Library for supported controllers
- * Created by Brian Lubkeman, 10 May 2021
+ * Created by Brian Lubkeman, 16 June 2021
  * Inspired by S.H.A.D.O.W. controller code written by KnightShade
  * Released into the public domain.
  */
@@ -16,7 +16,7 @@
 #include <PS4BT.h>
 #include <PS3BT.h>
 #include "controllerEnums.h"
-#include "DebugUtils.h"
+#include "../toolbox/DebugUtils.h"
 
 #define DEBUG
 //#define TEST_CONTROLLER
@@ -283,7 +283,7 @@ class Controller_PS4 : public Controller
     virtual bool m_getUsbStatus(void);
 
   public:
-    Controller_PS4(const int settings[], const unsigned long timings[]);
+    Controller_PS4(const int settings[], const unsigned long timings[], bool pair=false);
     virtual ~Controller_PS4(void);
 
     static Controller_PS4* Controller_PS4::anchor;
@@ -314,7 +314,7 @@ class Controller_PS5 : public Controller
     virtual bool m_getUsbStatus(void);
 
   public:
-    Controller_PS5(const int settings[], const unsigned long timings[]);
+    Controller_PS5(const int settings[], const unsigned long timings[], bool pair=false);
     virtual ~Controller_PS5(void);
 
     static Controller_PS5* Controller_PS5::anchor;

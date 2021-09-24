@@ -1,7 +1,7 @@
 /* =================================================================================
  *    B.L.A.C.Box: Brian Lubkeman's Astromech Controller
  * =================================================================================
- *                          Last Revised Date: 10 May 2021
+ *                          Last Revised Date: 24 September 2021
  *                          Revised By: Brian E. Lubkeman
  *  Inspired by the PADAWAN (danf), SHADOW (KnightShade), SHADOW_MD (vint43) effort
  * =================================================================================
@@ -35,7 +35,7 @@
  *   7.  Achieved - Support drive motor control using Roboteq SBL2360 (without mixing).
  *   8.  Achieved - Support dome motor control using a Syren 10.
  *   9   Testing  - Support radio communication with dome electroncis instead of a slip ring.
- *   10. Testing  - Support drive motor control using Sabertooth.
+ *   10. Future   - Support drive motor control using Sabertooth.
  *   11. Future   - Support drive motor control using Roboteq SBL1360 (with mixing).
  *   12. Future   - Support I2C-based FX system to replace Marcduino body master.
  *
@@ -76,17 +76,11 @@
  * 
  */
 #include "Settings.h"
-#include "DebugUtils.h"
-/*
-#include "src/Controller/Controller.h"
-#include "src/DomeMotor/DomeMotor.h"
-#include "src/DriveMotor/DriveMotor.h"
-#include "src/Marcduino/Marcduino.h"
-*/
-#include "Controller.h"
-#include "DomeMotor.h"
-#include "DriveMotor.h"
-#include "Marcduino.h"
+#include "src/toolbox/DebugUtils.h"
+#include "src/controller/Controller.h"
+#include "src/domeMotor/DomeMotor.h"
+#include "src/driveMotor/DriveMotor.h"
+#include "src/marcduino/Marcduino.h"
 
 #if defined(PS3_NAVIGATION)
 Controller_PS3Nav controller(controllerSettings, controllerTimings);
@@ -95,10 +89,10 @@ Controller_PS3Nav* Controller_PS3Nav::anchor = { NULL };
 Controller_PS3 controller(controllerSettings, controllerTimings);
 Controller_PS3* Controller_PS3::anchor = { NULL };
 #elif defined(PS4_CONTROLLER)
-Controller_PS4 controller(controllerSettings, controllerTimings);
+Controller_PS4 controller(controllerSettings, controllerTimings, pair);
 Controller_PS4* Controller_PS4::anchor = { NULL };
 #elif defined(PS5_CONTROLLER)
-Controller_PS5 controller(controllerSettings, controllerTimings);
+Controller_PS5 controller(controllerSettings, controllerTimings, pair);
 Controller_PS5* Controller_PS5::anchor = { NULL };
 #endif
 
@@ -109,8 +103,8 @@ Marcduino marcduino(&controller, marcduinoSettings);
 // Rearrange the Serial configurations to fit your electronics.
 
 HardwareSerial &MD_Body_Serial    = Serial3;
-HardwareSerial &DomeMotor_Serial  = Serial2;
-HardwareSerial &DriveMotor_Serial = Serial2;
+HardwareSerial &DomeMotor_Serial  = Serial2;  // Connects to Syren10.
+HardwareSerial &DriveMotor_Serial = Serial2;  // Daisy chain Syren10 to Sabertooth. Roboteq RS232/Serial is not yet supported.
 HardwareSerial &MD_Dome_Serial    = Serial1;
 
 
