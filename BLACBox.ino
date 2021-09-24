@@ -1,7 +1,7 @@
 /* =================================================================================
  *    B.L.A.C.Box: Brian Lubkeman's Astromech Controller
  * =================================================================================
- *                          Last Revised Date: 16 June 2021
+ *                          Last Revised Date: 24 September 2021
  *                          Revised By: Brian E. Lubkeman
  *  Inspired by the PADAWAN (danf), SHADOW (KnightShade), SHADOW_MD (vint43) effort
  * =================================================================================
@@ -35,7 +35,7 @@
  *   7.  Achieved - Support drive motor control using Roboteq SBL2360 (without mixing).
  *   8.  Achieved - Support dome motor control using a Syren 10.
  *   9   Testing  - Support radio communication with dome electroncis instead of a slip ring.
- *   10. Testing  - Support drive motor control using Sabertooth.
+ *   10. Future   - Support drive motor control using Sabertooth.
  *   11. Future   - Support drive motor control using Roboteq SBL1360 (with mixing).
  *   12. Future   - Support I2C-based FX system to replace Marcduino body master.
  *
